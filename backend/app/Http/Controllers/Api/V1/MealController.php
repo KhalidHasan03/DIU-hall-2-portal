@@ -1,0 +1,335 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Models\DailyMenu;
+use App\Models\MealAttendance;
+use App\Models\Setting;
+use App\Models\Student;
+use App\Models\Transaction;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class MealController extends Controller
+{
+    public function book(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'daily_menu_id' => 'required|exists:daily_menus,id',
+        ]);
+
+        $student = $request->user()->student;
+        if (!$student) {
+            return response()->json(['message' => 'Student profile not found.'], 404);
+        }
+
+        if ($student->status !== 'approved') {
+            return response()->json(['message' => 'Your account is not yet approved.'], 403);
+        }
+
+        $menu = DailyMenu::find($validated['daily_menu_id']);
+        if ($menu->date->toDateString() !== now()->toDateString()) {
+            return response()->json(['message' => 'Can only book meals for today.'], 422);
+        }
+
+        $cutoffKey = $menu->meal_type === 'lunch' ? 'lunch_cutoff_time' : 'dinner_cutoff_time';
+        $cutoff = Setting::where('key', $cutoffKey)->value('value');
+        if ($cutoff && now()->format('H:i') >= $cutoff) {
+            return response()->json(['message' => 'Booking is closed for this meal.'], 403);
+        }
+
+        $existing = MealAttendance::where('student_id', $student->id)
+            ->where('daily_menu_id', $validated['daily_menu_id'])
+            ->first();
+
+        if ($existing) {
+            return response()->json(['message' => 'Already booked for this meal.'], 422);
+        }
+
+        $attendance = MealAttendance::create([
+            'student_id' => $student->id,
+            'daily_menu_id' => $validated['daily_menu_id'],
+            'status' => 'booked',
+        ]);
+
+        return response()->json($attendance, 201);
+    }
+
+    public function cancel(Request $request, MealAttendance $mealAttendance): JsonResponse
+    {
+        $student = $request->user()->student;
+        if (!$student || $mealAttendance->student_id !== $student->id) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        if ($student->status !== 'approved') {
+            return response()->json(['message' => 'Your account is not yet approved.'], 403);
+        }
+
+        $mealAttendance->update(['status' => 'cancelled']);
+        return response()->json(['message' => 'Meal cancelled.']);
+    }
+
+    public function todayStatus(Request $request): JsonResponse
+    {
+        $student = $request->user()->student;
+        if (!$student) {
+            return response()->json([], 200);
+        }
+
+        $today = now()->toDateString();
+        $menus = DailyMenu::where('date', $today)->get();
+        $attendances = MealAttendance::where('student_id', $student->id)
+            ->whereIn('daily_menu_id', $menus->pluck('id'))
+            ->get()
+            ->keyBy('daily_menu_id');
+
+        $lunchCutoff = Setting::where('key', 'lunch_cutoff_time')->value('value') ?? '12:00';
+        $dinnerCutoff = Setting::where('key', 'dinner_cutoff_time')->value('value') ?? '14:00';
+        $now = now()->format('H:i');
+
+        $result = $menus->map(function ($menu) use ($attendances, $lunchCutoff, $dinnerCutoff, $now) {
+            $att = $attendances->get($menu->id);
+            $cutoff = $menu->meal_type === 'lunch' ? $lunchCutoff : $dinnerCutoff;
+            return [
+                'menu' => $menu,
+                'status' => $att ? $att->status : null,
+                'attendance_id' => $att ? $att->id : null,
+                'cutoff_time' => $cutoff,
+                'can_toggle' => $now < $cutoff,
+            ];
+        });
+
+        return response()->json($result);
+    }
+
+    public function history(Request $request): JsonResponse
+    {
+        $student = $request->user()->student;
+        if (!$student) {
+            return response()->json([], 200);
+        }
+
+        $month = $request->input('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+
+        $attendances = MealAttendance::where('student_id', $student->id)
+            ->whereHas('dailyMenu', function ($q) use ($year, $monthNum) {
+                $q->whereYear('date', $year)->whereMonth('date', $monthNum);
+            })
+            ->with('dailyMenu')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($attendances);
+    }
+
+    public function markAttendance(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'attendances' => 'required|array',
+            'attendances.*.id' => 'required|exists:meal_attendance,id',
+            'attendances.*.status' => 'required|in:attended,cancelled',
+        ]);
+
+        $userId = $request->user()->id;
+
+        $lunchPrice = (float) (Setting::where('key', 'lunch_price')->value('value') ?? 50);
+        $dinnerPrice = (float) (Setting::where('key', 'dinner_price')->value('value') ?? 60);
+
+        DB::transaction(function () use ($validated, $userId, $lunchPrice, $dinnerPrice) {
+            foreach ($validated['attendances'] as $att) {
+                $record = MealAttendance::with('dailyMenu', 'student')->find($att['id']);
+                if (!$record) continue;
+
+                $wasAlreadyAttended = $record->status === 'attended';
+                $newStatus = $att['status'];
+
+                $record->update([
+                    'status' => $newStatus,
+                    'marked_by' => $userId,
+                    'marked_at' => now(),
+                ]);
+
+                if ($newStatus === 'attended' && !$wasAlreadyAttended) {
+                    $price = $record->dailyMenu->meal_type === 'lunch' ? $lunchPrice : $dinnerPrice;
+                    $student = $record->student;
+
+                    if ($student && $price > 0) {
+                        $balanceBefore = $student->balance;
+                        $student->decrement('balance', $price);
+
+                        Transaction::create([
+                            'student_id' => $student->id,
+                            'type' => 'debit',
+                            'amount' => $price,
+                            'balance_before' => $balanceBefore,
+                            'balance_after' => $student->fresh()->balance,
+                            'description' => ucfirst($record->dailyMenu->meal_type) . ' meal on ' . $record->dailyMenu->date->toDateString(),
+                            'reference_type' => 'meal_attendance',
+                            'reference_id' => $record->id,
+                            'created_by' => $userId,
+                        ]);
+                    }
+                }
+            }
+        });
+
+        return response()->json(['message' => 'Attendance marked.']);
+    }
+
+    public function dailyReport(Request $request): JsonResponse
+    {
+        $date = $request->input('date', now()->toDateString());
+
+        $menus = DailyMenu::where('date', $date)->get();
+        $result = [];
+
+        foreach ($menus as $menu) {
+            $total = MealAttendance::where('daily_menu_id', $menu->id)->count();
+            $booked = MealAttendance::where('daily_menu_id', $menu->id)->where('status', 'booked')->count();
+            $attended = MealAttendance::where('daily_menu_id', $menu->id)->where('status', 'attended')->count();
+            $cancelled = MealAttendance::where('daily_menu_id', $menu->id)->where('status', 'cancelled')->count();
+
+            $result[] = [
+                'menu' => $menu,
+                'total' => $total,
+                'booked' => $booked,
+                'attended' => $attended,
+                'cancelled' => $cancelled,
+            ];
+        }
+
+        return response()->json($result);
+    }
+
+    public function todayStatusAll(Request $request): JsonResponse
+    {
+        $date = now()->toDateString();
+        $students = Student::where('status', 'approved')->with('user')->get();
+        $menus = DailyMenu::whereDate('date', $date)->get();
+
+        $lunchMenu = $menus->firstWhere('meal_type', 'lunch');
+        $dinnerMenu = $menus->firstWhere('meal_type', 'dinner');
+
+        $lunchOn = $lunchMenu ? MealAttendance::where('daily_menu_id', $lunchMenu->id)->whereIn('status', ['booked', 'attended'])->pluck('student_id')->toArray() : [];
+        $dinnerOn = $dinnerMenu ? MealAttendance::where('daily_menu_id', $dinnerMenu->id)->whereIn('status', ['booked', 'attended'])->pluck('student_id')->toArray() : [];
+
+        return response()->json($students->map(function ($student) use ($lunchOn, $dinnerOn) {
+            return [
+                'id' => $student->id,
+                'name' => $student->user->name,
+                'room_number' => $student->room_number,
+                'lunch_on' => in_array($student->id, $lunchOn),
+                'dinner_on' => in_array($student->id, $dinnerOn),
+            ];
+        }));
+    }
+
+    public function toggle(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'student_id' => 'required|exists:students,id',
+            'meal_type' => 'required|in:lunch,dinner',
+            'action' => 'required|in:on,off',
+        ]);
+
+        $date = now()->toDateString();
+        $menu = DailyMenu::whereDate('date', $date)->where('meal_type', $validated['meal_type'])->first();
+        if (!$menu) {
+            $menu = DailyMenu::create([
+                'date' => $date,
+                'meal_type' => $validated['meal_type'],
+                'menu_text' => 'General',
+                'created_by' => $request->user()->id,
+            ]);
+        }
+
+        $attendance = MealAttendance::where('student_id', $validated['student_id'])
+            ->where('daily_menu_id', $menu->id)
+            ->first();
+
+        if ($validated['action'] === 'on') {
+            if ($attendance && $attendance->status === 'cancelled') {
+                $attendance->update(['status' => 'booked']);
+            } elseif (!$attendance) {
+                $attendance = MealAttendance::create([
+                    'student_id' => $validated['student_id'],
+                    'daily_menu_id' => $menu->id,
+                    'status' => 'booked',
+                ]);
+            }
+            return response()->json(['status' => 'booked', 'attendance_id' => $attendance->id]);
+        }
+
+        if ($attendance && $attendance->status === 'booked') {
+            $attendance->update(['status' => 'cancelled']);
+        }
+        return response()->json(['status' => 'cancelled', 'attendance_id' => $attendance?->id]);
+    }
+
+    public function studentToggle(Request $request): JsonResponse
+    {
+        $student = $request->user()->student;
+        if (!$student) {
+            return response()->json(['message' => 'Student profile not found.'], 404);
+        }
+
+        if ($student->status !== 'approved') {
+            return response()->json(['message' => 'Your account is not yet approved.'], 403);
+        }
+
+        $validated = $request->validate([
+            'meal_type' => 'required|in:lunch,dinner',
+            'action' => 'required|in:on,off',
+        ]);
+
+        $cutoffKey = $validated['meal_type'] === 'lunch' ? 'lunch_cutoff_time' : 'dinner_cutoff_time';
+        $cutoff = Setting::where('key', $cutoffKey)->value('value');
+
+        if ($cutoff) {
+            $now = now()->format('H:i');
+            if ($now >= $cutoff) {
+                $mealLabel = ucfirst($validated['meal_type']);
+                return response()->json([
+                    'message' => "{$mealLabel} booking is closed after {$cutoff}. Please toggle before the cutoff time.",
+                ], 403);
+            }
+        }
+
+        $date = now()->toDateString();
+        $menu = DailyMenu::whereDate('date', $date)->where('meal_type', $validated['meal_type'])->first();
+        if (!$menu) {
+            $menu = DailyMenu::create([
+                'date' => $date,
+                'meal_type' => $validated['meal_type'],
+                'menu_text' => 'General',
+                'created_by' => $request->user()->id,
+            ]);
+        }
+
+        $attendance = MealAttendance::where('student_id', $student->id)
+            ->where('daily_menu_id', $menu->id)
+            ->first();
+
+        if ($validated['action'] === 'on') {
+            if ($attendance && $attendance->status === 'cancelled') {
+                $attendance->update(['status' => 'booked']);
+            } elseif (!$attendance) {
+                $attendance = MealAttendance::create([
+                    'student_id' => $student->id,
+                    'daily_menu_id' => $menu->id,
+                    'status' => 'booked',
+                ]);
+            }
+            return response()->json(['status' => 'booked', 'attendance_id' => $attendance->id]);
+        }
+
+        if ($attendance && $attendance->status === 'booked') {
+            $attendance->update(['status' => 'cancelled']);
+        }
+        return response()->json(['status' => 'cancelled', 'attendance_id' => $attendance?->id]);
+    }
+}
