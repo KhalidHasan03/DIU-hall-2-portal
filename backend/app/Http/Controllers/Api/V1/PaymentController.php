@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\MealAttendance;
 use App\Models\MonthlyBill;
 use App\Models\Payment;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
@@ -65,6 +67,88 @@ class PaymentController extends Controller
     public function show(Payment $payment): JsonResponse
     {
         return response()->json($payment->load('student.user', 'monthlyBill', 'recorder'));
+    }
+
+    public function summary(): JsonResponse
+    {
+        $month = now()->format('Y-m');
+        [$year, $monthNum] = explode('-', $month);
+
+        $totalWalletCredits = Transaction::where('type', 'credit')->sum('amount');
+        $totalMealDeductions = Transaction::where('type', 'debit')->sum('amount');
+        $totalBillCollections = Payment::sum('amount');
+
+        $monthWalletCredits = Transaction::where('type', 'credit')
+            ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
+            ->sum('amount');
+        $monthMealDeductions = Transaction::where('type', 'debit')
+            ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
+            ->sum('amount');
+        $monthBillCollections = Payment::whereYear('paid_at', $year)->whereMonth('paid_at', $monthNum)
+            ->sum('amount');
+
+        $lunchPrice = (float) (Setting::where('key', 'lunch_price')->value('value') ?? 50);
+        $dinnerPrice = (float) (Setting::where('key', 'dinner_price')->value('value') ?? 60);
+
+        $students = Student::where('status', 'approved')->with('user')->get()->map(function ($s) {
+            return [
+                'id' => $s->id,
+                'name' => $s->user->name,
+                'room_number' => $s->room_number,
+                'balance' => (float) $s->balance,
+            ];
+        });
+
+        $recentActivity = collect();
+
+        Transaction::with('student.user', 'creator')
+            ->where('type', 'credit')
+            ->latest()->take(10)->get()
+            ->each(function ($t) use (&$recentActivity) {
+                $recentActivity->push([
+                    'id' => 'txn-' . $t->id,
+                    'type' => 'wallet_credit',
+                    'student_name' => $t->student->user->name ?? 'Unknown',
+                    'amount' => (float) $t->amount,
+                    'description' => $t->description ?? 'Advance payment',
+                    'created_at' => $t->created_at,
+                ]);
+            });
+
+        Payment::with('student.user')
+            ->latest('paid_at')->take(10)->get()
+            ->each(function ($p) use (&$recentActivity) {
+                $recentActivity->push([
+                    'id' => 'pay-' . $p->id,
+                    'type' => 'bill_payment',
+                    'student_name' => $p->student->user->name ?? 'Unknown',
+                    'amount' => (float) $p->amount,
+                    'description' => 'Bill payment (' . ($p->monthlyBill->month ?? 'N/A') . ')',
+                    'created_at' => $p->paid_at,
+                ]);
+            });
+
+        $recentActivity = $recentActivity->sortByDesc('created_at')->values()->take(15);
+
+        return response()->json([
+            'totals' => [
+                'wallet_credits' => $totalWalletCredits,
+                'meal_deductions' => $totalMealDeductions,
+                'bill_collections' => $totalBillCollections,
+                'net_wallet_in_use' => $totalWalletCredits - $totalMealDeductions,
+            ],
+            'monthly' => [
+                'wallet_credits' => $monthWalletCredits,
+                'meal_deductions' => $monthMealDeductions,
+                'bill_collections' => $monthBillCollections,
+            ],
+            'prices' => [
+                'lunch' => $lunchPrice,
+                'dinner' => $dinnerPrice,
+            ],
+            'students' => $students,
+            'recent_activity' => $recentActivity,
+        ]);
     }
 
     public function advance(Request $request): JsonResponse

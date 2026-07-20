@@ -7,7 +7,6 @@ import ProtectedRoute from '../components/auth/ProtectedRoute';
 import StudentDashboard from '../pages/student/Dashboard';
 import StudentMenuPage from '../pages/student/MenuPage';
 import StudentMealsPage from '../pages/student/MealsPage';
-import StudentBillsPage from '../pages/student/BillsPage';
 import StudentPaymentsPage from '../pages/student/PaymentsPage';
 import StudentWalletPage from '../pages/student/WalletPage';
 
@@ -79,7 +78,6 @@ function StudentRoutes() {
       <Route index element={<StudentDashboard />} />
       <Route path="menu" element={<StudentMenuPage />} />
       <Route path="meals" element={<StudentMealsPage />} />
-      <Route path="bills" element={<StudentBillsPage />} />
       <Route path="payments" element={<StudentPaymentsPage />} />
       <Route path="wallet" element={<StudentWalletPage />} />
     </Routes>

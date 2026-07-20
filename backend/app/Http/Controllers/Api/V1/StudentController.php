@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\DailyMenu;
+use App\Models\MealAttendance;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -129,5 +131,61 @@ class StudentController extends Controller
         $student->user->delete();
         $student->delete();
         return response()->json(['message' => 'Student deleted.']);
+    }
+
+    public function mealSummary(Request $request): JsonResponse
+    {
+        $date = now()->toDateString();
+        $month = now()->format('Y-m');
+        [$year, $monthNum] = explode('-', $month);
+
+        $todayMenus = DailyMenu::whereDate('date', $date)->get();
+        $lunchMenuId = $todayMenus->firstWhere('meal_type', 'lunch')?->id;
+        $dinnerMenuId = $todayMenus->firstWhere('meal_type', 'dinner')?->id;
+
+        $students = Student::with('user')->where('status', 'approved')->get();
+
+        $result = $students->map(function ($student) use ($lunchMenuId, $dinnerMenuId, $date, $year, $monthNum) {
+            $lunchToday = $lunchMenuId
+                ? MealAttendance::where('student_id', $student->id)
+                    ->where('daily_menu_id', $lunchMenuId)
+                    ->whereIn('status', ['booked', 'attended'])
+                    ->exists()
+                : false;
+
+            $dinnerToday = $dinnerMenuId
+                ? MealAttendance::where('student_id', $student->id)
+                    ->where('daily_menu_id', $dinnerMenuId)
+                    ->whereIn('status', ['booked', 'attended'])
+                    ->exists()
+                : false;
+
+            $monthLunches = MealAttendance::where('student_id', $student->id)
+                ->where('status', 'attended')
+                ->whereHas('dailyMenu', fn($q) => $q->where('meal_type', 'lunch')->whereYear('date', $year)->whereMonth('date', $monthNum))
+                ->count();
+
+            $monthDinners = MealAttendance::where('student_id', $student->id)
+                ->where('status', 'attended')
+                ->whereHas('dailyMenu', fn($q) => $q->where('meal_type', 'dinner')->whereYear('date', $year)->whereMonth('date', $monthNum))
+                ->count();
+
+            return [
+                'id' => $student->id,
+                'name' => $student->user->name,
+                'email' => $student->user->email,
+                'room_number' => $student->room_number,
+                'status' => $student->status,
+                'balance' => (float) $student->balance,
+                'lunch_today' => $lunchToday,
+                'dinner_today' => $dinnerToday,
+                'month_lunches' => $monthLunches,
+                'month_dinners' => $monthDinners,
+                'total_month_meals' => $monthLunches + $monthDinners,
+                'student_id' => $student->student_id,
+            ];
+        });
+
+        return response()->json($result);
     }
 }

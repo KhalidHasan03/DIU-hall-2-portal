@@ -69,13 +69,17 @@ Route::prefix('v1')->group(function () {
             Route::get('/bills/pending', [BillController::class, 'pending']);
             Route::post('/payments/record', [PaymentController::class, 'record']);
             Route::post('/payments/advance', [PaymentController::class, 'advance']);
+            Route::get('/payments/summary', [PaymentController::class, 'summary']);
             Route::get('/payments', [PaymentController::class, 'index']);
-            Route::apiResource('students', StudentController::class);
+            Route::get('/students/meal-summary', [StudentController::class, 'mealSummary']);
             Route::get('/students/pending', [StudentController::class, 'pending']);
+            Route::apiResource('students', StudentController::class);
             Route::post('/students/{student}/approve', [StudentController::class, 'approve']);
             Route::post('/students/{student}/reject', [StudentController::class, 'reject']);
             Route::get('/settings/meal', [SettingController::class, 'mealSettings']);
             Route::get('/reports/monthly', [ReportController::class, 'monthly']);
+            Route::get('/reports/detailed', [ReportController::class, 'detailed']);
+            Route::get('/reports/export', [ReportController::class, 'export']);
             Route::post('/notices', [NoticeController::class, 'store']);
             Route::put('/notices/{notice}', [NoticeController::class, 'update']);
             Route::delete('/notices/{notice}', [NoticeController::class, 'destroy']);
@@ -84,6 +88,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:hall_tutor|super_admin')->prefix('hall-tutor')->group(function () {
             Route::get('/dashboard', [TutorDashboardController::class, 'index']);
             Route::get('/reports/monthly', [ReportController::class, 'monthly']);
+            Route::get('/reports/detailed', [ReportController::class, 'detailed']);
+            Route::get('/reports/export', [ReportController::class, 'export']);
             Route::get('/income-expenses', [ReportController::class, 'incomeVsExpense']);
             Route::get('/due-students', [BillController::class, 'dueStudents']);
             Route::get('/students/pending', [StudentController::class, 'pending']);
