@@ -14,7 +14,7 @@ class Student extends Model
     protected $fillable = [
         'user_id', 'student_id', 'room_number', 'department',
         'batch', 'emergency_contact', 'admission_date', 'status',
-        'balance',
+        'balance', 'meal_debt',
     ];
 
     protected function casts(): array
@@ -22,6 +22,7 @@ class Student extends Model
         return [
             'admission_date' => 'date',
             'balance' => 'decimal:2',
+            'meal_debt' => 'decimal:2',
         ];
     }
 

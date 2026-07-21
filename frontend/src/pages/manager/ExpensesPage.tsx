@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { getLocalDateString } from '../../utils/dateUtils';
 
 export default function ManagerExpensesPage() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ category: 'food', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0] });
+  const [form, setForm] = useState({ category: 'food', description: '', amount: '', expense_date: getLocalDateString() });
 
   const fetchExpenses = () => {
     setLoading(true);
-    api.get('/manager/expenses').then(({ data }) => setExpenses(data.data || data)).finally(() => setLoading(false));
+    api.get('/manager/expenses').then(({ data }) => setExpenses(data.data || data)).catch(() => toast.error('Failed to load expenses')).finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchExpenses(); }, []);
@@ -22,7 +23,7 @@ export default function ManagerExpensesPage() {
       await api.post('/manager/expenses', { ...form, amount: parseFloat(form.amount) });
       toast.success('Expense recorded');
       setShowForm(false);
-      setForm({ category: 'food', description: '', amount: '', expense_date: new Date().toISOString().split('T')[0] });
+      setForm({ category: 'food', description: '', amount: '', expense_date: getLocalDateString() });
       fetchExpenses();
     } catch { toast.error('Failed to save expense'); }
   };

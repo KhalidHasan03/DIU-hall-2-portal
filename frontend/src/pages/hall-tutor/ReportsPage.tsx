@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import { getLocalMonthString } from '../../utils/dateUtils';
 
 export default function TutorReportsPage() {
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(getLocalMonthString());
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 

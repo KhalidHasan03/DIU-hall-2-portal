@@ -31,11 +31,15 @@ export default function WalletPage() {
       </div>
 
       <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-100 text-center">
-        <p className="text-xs md:text-sm text-slate-500 font-medium uppercase tracking-wider">Current Balance</p>
-        <p className={`text-3xl md:text-5xl font-bold mt-2 ${balance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-          ৳{balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <p className="text-xs md:text-sm text-slate-500 font-medium uppercase tracking-wider">
+          {balance >= 0 ? 'Current Balance' : 'Outstanding Debt'}
         </p>
-        <p className="text-xs text-slate-400 mt-2">Meal costs are auto-deducted when attendance is marked</p>
+        <p className={`text-3xl md:text-5xl font-bold mt-2 ${balance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          {balance >= 0 ? '৳' : '-৳'}{Math.abs(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </p>
+        <p className="text-xs text-slate-400 mt-2">
+          {balance >= 0 ? 'Meal costs are auto-deducted when attendance is marked' : 'Outstanding meal debt. Pay advance to clear.'}
+        </p>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -95,7 +99,7 @@ export default function WalletPage() {
             <h3 className="text-sm md:text-base font-semibold text-slate-800">How It Works</h3>
             <ul className="text-xs md:text-sm text-slate-600 mt-2 space-y-1.5 list-disc list-inside">
               <li>Manager adds advance payments to your wallet</li>
-              <li>Each meal you attend costs ৳50 (lunch) or ৳60 (dinner)</li>
+              <li>Each meal cost is calculated dynamically based on monthly expenses</li>
               <li>Cost is auto-deducted when the manager marks your attendance</li>
               <li>Check your balance regularly to avoid running low</li>
             </ul>

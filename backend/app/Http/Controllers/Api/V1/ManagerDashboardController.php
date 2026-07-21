@@ -7,9 +7,9 @@ use App\Models\DailyMenu;
 use App\Models\Expense;
 use App\Models\MealAttendance;
 use App\Models\MonthlyBill;
-use App\Models\Payment;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,20 +22,22 @@ class ManagerDashboardController extends Controller
         $today = now()->toDateString();
 
         $totalStudents = Student::where('status', 'approved')->count();
-        $totalCollection = Payment::whereYear('paid_at', $year)->whereMonth('paid_at', $monthNum)->sum('amount');
+        $totalCollection = Transaction::where('type', 'credit')
+            ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)->sum('amount');
         $totalExpenses = Expense::whereYear('expense_date', $year)->whereMonth('expense_date', $monthNum)->sum('amount');
 
-        $totalDue = MonthlyBill::where('month', $month)
-            ->get()
-            ->sum(function ($bill) {
-                return max(0, $bill->total_amount - $bill->payments()->sum('amount'));
-            });
+        $totalDue = MonthlyBill::where('month', $month)->get()->sum(function ($bill) {
+            $student = $bill->student;
+            $wallet = $student ? (float) $student->balance : 0;
+            return max(0, (float) $bill->total_amount - $wallet);
+        });
 
         $totalMonthlyMeals = MealAttendance::whereHas('dailyMenu', function ($q) use ($year, $monthNum) {
             $q->whereYear('date', $year)->whereMonth('date', $monthNum);
         })->whereIn('status', ['booked', 'attended'])->count();
 
-        $recentPayments = Payment::with('student.user')
+        $recentPayments = Transaction::where('type', 'credit')
+            ->with('student.user', 'creator')
             ->latest()->take(5)->get();
         $recentExpenses = Expense::latest()->take(5)->get();
 

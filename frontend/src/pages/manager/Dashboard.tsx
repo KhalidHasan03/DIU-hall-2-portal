@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import toast from 'react-hot-toast';
 
 function MgStatCard({ title, value, sub, icon, gradient }: { title: string; value: string | number; sub?: string; icon: string; gradient: string }) {
   return (
@@ -19,12 +20,79 @@ function MgStatCard({ title, value, sub, icon, gradient }: { title: string; valu
   );
 }
 
+function ManagerMealSettings(_props: { data: any }) {
+  const [show, setShow] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ lunch_cutoff_time: '', dinner_cutoff_time: '' });
+
+  useEffect(() => {
+    if (show) {
+      api.get('/manager/settings/meal').then(({ data: s }) => {
+        setForm({
+          lunch_cutoff_time: s.lunch_cutoff_time || '12:00',
+          dinner_cutoff_time: s.dinner_cutoff_time || '14:00',
+        });
+      }).catch(() => toast.error('Failed to load settings'));
+    }
+  }, [show]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.put('/manager/settings/meal', {
+        lunch_cutoff_time: form.lunch_cutoff_time,
+        dinner_cutoff_time: form.dinner_cutoff_time,
+      });
+      toast.success('Settings updated');
+      setShow(false);
+    } catch {
+      toast.error('Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold text-slate-800 flex items-center gap-2 text-sm md:text-base">
+          <span className="w-1.5 h-5 bg-indigo-500 rounded-full inline-block" />
+          Meal Cutoff Settings
+        </h2>
+        <button onClick={() => setShow(!show)} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">
+          {show ? 'Cancel' : 'Edit'}
+        </button>
+      </div>
+      {show && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Lunch Cutoff Time</label>
+              <input type="time" value={form.lunch_cutoff_time} onChange={e => setForm({...form, lunch_cutoff_time: e.target.value})}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Dinner Cutoff Time</label>
+              <input type="time" value={form.dinner_cutoff_time} onChange={e => setForm({...form, dinner_cutoff_time: e.target.value})}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none" />
+            </div>
+          </div>
+          <button onClick={save} disabled={saving}
+            className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition-all disabled:opacity-50">
+            {saving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ManagerDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/manager/dashboard').then(({ data }) => setData(data)).finally(() => setLoading(false));
+    api.get('/manager/dashboard').then(({ data }) => setData(data)).catch(() => toast.error('Failed to load dashboard')).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner /></div>;
@@ -54,6 +122,8 @@ export default function ManagerDashboard() {
         <MgStatCard title="Lunch ON Today" value={`${data?.today_lunch_on || 0} / ${data?.total_students || 0}`} sub={`Cutoff: ${data?.lunch_cutoff || '12:00'}`} icon="☀️" gradient="bg-gradient-to-br from-orange-500 to-amber-600" />
         <MgStatCard title="Dinner ON Today" value={`${data?.today_dinner_on || 0} / ${data?.total_students || 0}`} sub={`Cutoff: ${data?.dinner_cutoff || '14:00'}`} icon="🌙" gradient="bg-gradient-to-br from-indigo-500 to-purple-600" />
       </div>
+
+      <ManagerMealSettings data={data} />
       {data?.pending_students > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
           <span className="text-xl">⏳</span>
@@ -75,7 +145,7 @@ export default function ManagerDashboard() {
                     <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-sm shrink-0">💳</div>
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-700 truncate">{p.student?.user?.name || 'Unknown'}</p>
-                      <p className="text-xs text-slate-400">{new Date(p.paid_at).toLocaleDateString('en-BD', { day: 'numeric', month: 'short' })}</p>
+                      <p className="text-xs text-slate-400">{new Date(p.created_at).toLocaleDateString('en-BD', { day: 'numeric', month: 'short' })}</p>
                     </div>
                   </div>
                   <span className="text-sm font-bold text-emerald-600 shrink-0">+ ৳{p.amount}</span>

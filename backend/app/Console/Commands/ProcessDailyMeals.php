@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\MealAttendance;
-use App\Models\Setting;
 use App\Models\Transaction;
+use App\Services\MealRateService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -16,9 +16,6 @@ class ProcessDailyMeals extends Command
     public function handle(): int
     {
         $date = $this->option('date') ?: now()->subDay()->toDateString();
-
-        $lunchPrice = (float) (Setting::where('key', 'lunch_price')->value('value') ?? 50);
-        $dinnerPrice = (float) (Setting::where('key', 'dinner_price')->value('value') ?? 60);
 
         $bookedRecords = MealAttendance::whereHas('dailyMenu', function ($q) use ($date) {
             $q->whereDate('date', $date);
@@ -35,9 +32,12 @@ class ProcessDailyMeals extends Command
         $errors = 0;
 
         foreach ($bookedRecords as $record) {
-            DB::transaction(function () use ($record, $lunchPrice, $dinnerPrice, $date, &$processed, &$errors) {
+            $mealMonth = $record->dailyMenu->date->format('Y-m');
+            $mealRate = MealRateService::calculate($mealMonth);
+
+            DB::transaction(function () use ($record, $mealRate, $date, &$processed, &$errors) {
                 try {
-                    $price = $record->dailyMenu->meal_type === 'lunch' ? $lunchPrice : $dinnerPrice;
+                    $price = $mealRate;
                     $student = $record->student;
 
                     if (!$student) {
@@ -45,8 +45,16 @@ class ProcessDailyMeals extends Command
                         return;
                     }
 
-                    $balanceBefore = $student->balance;
+                    $balanceBefore = (float) $student->balance;
                     $student->decrement('balance', $price);
+                    $student->refresh();
+                    $balanceAfter = (float) $student->balance;
+
+                    if ($balanceAfter < 0) {
+                        $student->update(['meal_debt' => abs($balanceAfter)]);
+                    } elseif ($student->meal_debt > 0) {
+                        $student->update(['meal_debt' => 0]);
+                    }
 
                     $record->update([
                         'status' => 'attended',
@@ -58,7 +66,7 @@ class ProcessDailyMeals extends Command
                         'type' => 'debit',
                         'amount' => $price,
                         'balance_before' => $balanceBefore,
-                        'balance_after' => $student->fresh()->balance,
+                        'balance_after' => $balanceAfter,
                         'description' => 'Auto: ' . ucfirst($record->dailyMenu->meal_type) . ' meal on ' . $date,
                         'reference_type' => 'meal_attendance',
                         'reference_id' => $record->id,

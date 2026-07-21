@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { getLocalMonthString } from '../../utils/dateUtils';
 
 export default function ManagerReportsPage() {
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(getLocalMonthString());
   const [summary, setSummary] = useState<any>(null);
   const [detailed, setDetailed] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -116,7 +117,7 @@ export default function ManagerReportsPage() {
         <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
           <p className="text-xs text-slate-500 font-medium">Total Meals Served</p>
           <p className="text-xl md:text-2xl font-bold text-slate-800 mt-1">{t.total_meals || 0}</p>
-          <p className="text-xs text-slate-400 mt-0.5">{t.lunches || 0} lunches / {t.dinners || 0} dinners</p>
+          <p className="text-xs text-slate-400 mt-0.5">{s.total_lunches || 0} lunches / {s.total_dinners || 0} dinners</p>
         </div>
         <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
           <p className="text-xs text-slate-500 font-medium">Wallet Activity</p>
@@ -127,8 +128,9 @@ export default function ManagerReportsPage() {
           <p className="text-xs text-slate-500 font-medium">Bill Collection</p>
           <p className="text-xl md:text-2xl font-bold text-blue-600 mt-1">৳{Number(t.bill_paid || 0).toLocaleString()}</p>
           <p className="text-xs text-slate-400 mt-0.5">
-            Collected / ৳{Number(t.bill_totals || 0).toLocaleString()} total
+            Wallet-covered / ৳{Number(t.bill_totals || 0).toLocaleString()} total
             {t.bill_due > 0 && <span className="text-rose-500"> (৳{Number(t.bill_due).toLocaleString()} due)</span>}
+            {t.get_back > 0 && <span className="text-emerald-500"> (৳{Number(t.get_back).toLocaleString()} surplus)</span>}
           </p>
         </div>
       </div>
@@ -141,7 +143,7 @@ export default function ManagerReportsPage() {
           </h2>
           <span className="text-xs text-slate-400">{sortedStudents.length} student{sortedStudents.length !== 1 ? 's' : ''}</span>
         </div>
-        <p className="text-xs text-slate-400 mb-4">Pricing: Lunch=৳{detailed?.lunch_price || 50} / Dinner=৳{detailed?.dinner_price || 60}</p>
+        <p className="text-xs text-slate-400 mb-4">Meal Rate: ৳{detailed?.meal_rate || 0} per meal (total expenses ÷ total meals)</p>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -151,8 +153,8 @@ export default function ManagerReportsPage() {
                   Student <SortIcon field="name" />
                 </th>
                 <th className="text-left px-3 py-3 font-medium text-slate-500 text-xs uppercase tracking-wider">Room</th>
-                <th className="text-center px-3 py-3 font-medium text-slate-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-slate-700" onClick={() => handleSort('lunches')}>
-                  Meals <SortIcon field="lunches" />
+                <th className="text-center px-3 py-3 font-medium text-slate-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-slate-700" onClick={() => handleSort('total_meals')}>
+                  Meals <SortIcon field="total_meals" />
                 </th>
                 <th className="text-right px-3 py-3 font-medium text-slate-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-slate-700" onClick={() => handleSort('meal_cost')}>
                   Meal Cost <SortIcon field="meal_cost" />
@@ -169,6 +171,9 @@ export default function ManagerReportsPage() {
                 <th className="text-right px-3 py-3 font-medium text-slate-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-slate-700" onClick={() => handleSort('bill_due')}>
                   Due <SortIcon field="bill_due" />
                 </th>
+                <th className="text-right px-3 py-3 font-medium text-slate-500 text-xs uppercase tracking-wider cursor-pointer select-none hover:text-slate-700" onClick={() => handleSort('get_back')}>
+                  Get Back <SortIcon field="get_back" />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -180,10 +185,8 @@ export default function ManagerReportsPage() {
                   </td>
                   <td className="px-3 py-3.5 text-slate-500 text-xs">{st.room_number}</td>
                   <td className="px-3 py-3.5 text-center">
-                    <span className="font-semibold text-slate-700">{st.lunches}L</span>
-                    {' / '}
-                    <span className="font-semibold text-slate-700">{st.dinners}D</span>
-                    <div className="text-[10px] text-slate-400">={st.total_meals} meals</div>
+                    <span className="font-semibold text-slate-700">{st.total_meals}</span>
+                    <span className="text-slate-400"> meals</span>
                   </td>
                   <td className="px-3 py-3.5 text-right font-medium text-slate-700">৳{Number(st.meal_cost).toLocaleString()}</td>
                   <td className="px-3 py-3.5 text-right font-medium text-emerald-600">৳{Number(st.wallet_credits).toLocaleString()}</td>
@@ -195,8 +198,15 @@ export default function ManagerReportsPage() {
                   <td className="px-3 py-3.5 text-right font-medium text-slate-700">৳{Number(st.bill_total).toLocaleString()}</td>
                   <td className="px-3 py-3.5 text-right">
                     <span className={`font-semibold ${st.bill_due > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      {st.bill_due > 0 ? `৳${Number(st.bill_due).toLocaleString()}` : '✓ Paid'}
+                      {st.bill_due > 0 ? `৳${Number(st.bill_due).toLocaleString()}` : '✓'}
                     </span>
+                  </td>
+                  <td className="px-3 py-3.5 text-right">
+                    {st.get_back > 0 ? (
+                      <span className="font-semibold text-emerald-600">৳{Number(st.get_back).toLocaleString()}</span>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -217,9 +227,9 @@ export default function ManagerReportsPage() {
           <span className="w-1 h-5 bg-amber-500 rounded-full inline-block" />
           Financial Summary
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-            <p className="text-xs text-emerald-700 font-medium">Collected (Bills)</p>
+            <p className="text-xs text-emerald-700 font-medium">Collected (Wallet)</p>
             <p className="text-lg font-bold text-emerald-800">৳{Number(s.total_collected || 0).toLocaleString()}</p>
           </div>
           <div className="p-3 rounded-xl bg-rose-50 border border-rose-200">
@@ -229,6 +239,10 @@ export default function ManagerReportsPage() {
           <div className="p-3 rounded-xl bg-blue-50 border border-blue-200">
             <p className="text-xs text-blue-700 font-medium">Wallet Credits</p>
             <p className="text-lg font-bold text-blue-800">৳{Number(t.wallet_credits || 0).toLocaleString()}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-violet-50 border border-violet-200">
+            <p className="text-xs text-violet-700 font-medium">Surplus (Get Back)</p>
+            <p className="text-lg font-bold text-violet-800">৳{Number(s.total_get_back || t.get_back || 0).toLocaleString()}</p>
           </div>
           <div className={`p-3 rounded-xl border ${(s.net_profit || 0) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
             <p className={`text-xs font-medium ${(s.net_profit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>Net Profit</p>

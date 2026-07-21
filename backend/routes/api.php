@@ -49,6 +49,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/meals/history', [MealController::class, 'history']);
             Route::get('/bills/current', [BillController::class, 'current']);
             Route::get('/bills/history', [BillController::class, 'history']);
+            Route::get('/bills/due-list', [BillController::class, 'dueList']);
             Route::get('/bills/{monthlyBill}', [BillController::class, 'show']);
             Route::get('/payments/history', [PaymentController::class, 'history']);
             Route::get('/wallet', [WalletController::class, 'balance']);
@@ -77,6 +78,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/students/{student}/approve', [StudentController::class, 'approve']);
             Route::post('/students/{student}/reject', [StudentController::class, 'reject']);
             Route::get('/settings/meal', [SettingController::class, 'mealSettings']);
+            Route::put('/settings/meal', [SettingController::class, 'updateMealSettings']);
             Route::get('/reports/monthly', [ReportController::class, 'monthly']);
             Route::get('/reports/detailed', [ReportController::class, 'detailed']);
             Route::get('/reports/export', [ReportController::class, 'export']);

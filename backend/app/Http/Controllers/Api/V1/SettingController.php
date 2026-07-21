@@ -31,9 +31,23 @@ class SettingController extends Controller
 
     public function mealSettings(): JsonResponse
     {
-        $keys = ['lunch_cutoff_time', 'dinner_cutoff_time', 'lunch_price', 'dinner_price'];
+        $keys = ['lunch_cutoff_time', 'dinner_cutoff_time', 'meal_rate'];
         $settings = Setting::whereIn('key', $keys)->get()->keyBy('key')->map(fn($s) => $s->value);
 
         return response()->json($settings);
+    }
+
+    public function updateMealSettings(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'lunch_cutoff_time' => 'sometimes|string|date_format:H:i',
+            'dinner_cutoff_time' => 'sometimes|string|date_format:H:i',
+        ]);
+
+        foreach ($validated as $key => $value) {
+            Setting::where('key', $key)->update(['value' => $value]);
+        }
+
+        return response()->json(['message' => 'Meal settings updated.']);
     }
 }

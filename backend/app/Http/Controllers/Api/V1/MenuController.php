@@ -17,10 +17,10 @@ class MenuController extends Controller
         return response()->json($menus);
     }
 
-    public function weekly(): JsonResponse
+    public function weekly(Request $request): JsonResponse
     {
         $start = now()->startOfWeek()->toDateString();
-        $end = now()->endOfWeek()->toDateString();
+        $end = now()->toDateString();
         $menus = DailyMenu::whereBetween('date', [$start, $end])
             ->orderBy('date')->with('creator')->get();
         return response()->json($menus);

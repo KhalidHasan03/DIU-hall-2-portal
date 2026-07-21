@@ -7,10 +7,9 @@ use App\Models\DailyMenu;
 use App\Models\Expense;
 use App\Models\MealAttendance;
 use App\Models\MonthlyBill;
-use App\Models\Payment;
-use App\Models\Setting;
 use App\Models\Student;
 use App\Models\Transaction;
+use App\Services\MealRateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,18 +21,30 @@ class ReportController extends Controller
         [$year, $monthNum] = explode('-', $month);
 
         $totalBills = MonthlyBill::where('month', $month)->sum('total_amount');
-        $totalPaid = Payment::whereYear('paid_at', $year)->whereMonth('paid_at', $monthNum)->sum('amount');
+        $totalWalletCredits = Transaction::where('type', 'credit')
+            ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
+            ->sum('amount');
         $totalExpenses = Expense::whereYear('expense_date', $year)->whereMonth('expense_date', $monthNum)->sum('amount');
         $studentCount = MonthlyBill::where('month', $month)->count();
         $paidCount = MonthlyBill::where('month', $month)->where('status', 'paid')->count();
         $pendingCount = MonthlyBill::where('month', $month)->whereIn('status', ['pending', 'partial', 'overdue'])->count();
 
-        $totalWalletCredits = Transaction::where('type', 'credit')
-            ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
-            ->sum('amount');
         $totalMealDeductions = Transaction::where('type', 'debit')
             ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
             ->sum('amount');
+
+        // Wallet-based due: for each student, bill_total - wallet_balance (if positive)
+        $students = Student::where('status', 'approved')->get();
+        $totalDue = 0;
+        $totalGetBack = 0;
+        foreach ($students as $student) {
+            $bill = MonthlyBill::where('student_id', $student->id)->where('month', $month)->first();
+            if (!$bill) continue;
+            $wallet = (float) $student->balance;
+            $billTotal = (float) $bill->total_amount;
+            $totalDue += max(0, $billTotal - $wallet);
+            $totalGetBack += max(0, $wallet - $billTotal);
+        }
 
         $totalLunches = MealAttendance::where('status', 'attended')
             ->whereHas('dailyMenu', fn($q) => $q->where('meal_type', 'lunch')->whereYear('date', $year)->whereMonth('date', $monthNum))
@@ -45,14 +56,16 @@ class ReportController extends Controller
         return response()->json([
             'month' => $month,
             'total_bills' => $totalBills,
-            'total_collected' => $totalPaid,
+            'total_collected' => $totalWalletCredits,
             'total_expenses' => $totalExpenses,
-            'net_profit' => $totalPaid - $totalExpenses,
+            'net_profit' => $totalWalletCredits - $totalExpenses,
             'total_students' => $studentCount,
             'paid_students' => $paidCount,
             'pending_students' => $pendingCount,
             'wallet_credits' => $totalWalletCredits,
             'meal_deductions' => $totalMealDeductions,
+            'total_due' => $totalDue,
+            'total_get_back' => $totalGetBack,
             'total_lunches' => $totalLunches,
             'total_dinners' => $totalDinners,
             'total_meals' => $totalLunches + $totalDinners,
@@ -64,66 +77,60 @@ class ReportController extends Controller
         $month = $request->input('month', now()->format('Y-m'));
         [$year, $monthNum] = explode('-', $month);
 
-        $lunchPrice = (float) (Setting::where('key', 'lunch_price')->value('value') ?? 50);
-        $dinnerPrice = (float) (Setting::where('key', 'dinner_price')->value('value') ?? 60);
+        $mealRate = MealRateService::calculate($month);
 
         $students = Student::with('user')->where('status', 'approved')->get();
         $result = [];
 
         foreach ($students as $student) {
-            $lunches = MealAttendance::where('student_id', $student->id)
+            $totalMeals = MealAttendance::where('student_id', $student->id)
                 ->where('status', 'attended')
-                ->whereHas('dailyMenu', fn($q) => $q->where('meal_type', 'lunch')->whereYear('date', $year)->whereMonth('date', $monthNum))
-                ->count();
-            $dinners = MealAttendance::where('student_id', $student->id)
-                ->where('status', 'attended')
-                ->whereHas('dailyMenu', fn($q) => $q->where('meal_type', 'dinner')->whereYear('date', $year)->whereMonth('date', $monthNum))
+                ->whereHas('dailyMenu', fn($q) => $q->whereYear('date', $year)->whereMonth('date', $monthNum))
                 ->count();
 
-            $mealCost = ($lunches * $lunchPrice) + ($dinners * $dinnerPrice);
+            $mealCost = $totalMeals * $mealRate;
 
             $walletCredits = Transaction::where('student_id', $student->id)
                 ->where('type', 'credit')
                 ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
                 ->sum('amount');
 
+            $walletBalance = (float) $student->balance;
             $bill = MonthlyBill::where('student_id', $student->id)->where('month', $month)->first();
             $billTotal = $bill ? (float) $bill->total_amount : 0;
-            $billPaid = $bill ? (float) $bill->payments()->sum('amount') : 0;
-            $billDue = max(0, $billTotal - $billPaid);
+            $billPaid = min($billTotal, $walletBalance);
+            $billDue = max(0, $billTotal - $walletBalance);
+            $getBack = max(0, $walletBalance - $billTotal);
 
             $result[] = [
                 'id' => $student->id,
                 'name' => $student->user->name,
                 'student_id' => $student->student_id,
                 'room_number' => $student->room_number,
-                'balance' => (float) $student->balance,
-                'lunches' => $lunches,
-                'dinners' => $dinners,
-                'total_meals' => $lunches + $dinners,
+                'balance' => $walletBalance,
+                'total_meals' => $totalMeals,
                 'meal_cost' => $mealCost,
                 'wallet_credits' => $walletCredits,
                 'bill_total' => $billTotal,
                 'bill_paid' => $billPaid,
                 'bill_due' => $billDue,
+                'get_back' => $getBack,
             ];
         }
 
         return response()->json([
             'month' => $month,
-            'lunch_price' => $lunchPrice,
-            'dinner_price' => $dinnerPrice,
+            'meal_rate' => $mealRate,
             'students' => $result,
             'totals' => [
                 'students' => count($result),
-                'lunches' => collect($result)->sum('lunches'),
-                'dinners' => collect($result)->sum('dinners'),
                 'total_meals' => collect($result)->sum('total_meals'),
                 'meal_costs' => collect($result)->sum('meal_cost'),
                 'wallet_credits' => collect($result)->sum('wallet_credits'),
                 'bill_totals' => collect($result)->sum('bill_total'),
                 'bill_paid' => collect($result)->sum('bill_paid'),
                 'bill_due' => collect($result)->sum('bill_due'),
+                'get_back' => collect($result)->sum('get_back'),
             ],
         ]);
     }
@@ -149,27 +156,28 @@ class ReportController extends Controller
             $t = $data['totals'];
             fputcsv($handle, ['Metric', 'Value']);
             fputcsv($handle, ['Total Students', $t['students']]);
-            fputcsv($handle, ['Total Lunches', $t['lunches']]);
-            fputcsv($handle, ['Total Dinners', $t['dinners']]);
             fputcsv($handle, ['Total Meals', $t['total_meals']]);
             fputcsv($handle, ['Meal Costs (BDT)', $t['meal_costs']]);
             fputcsv($handle, ['Wallet Credits (BDT)', $t['wallet_credits']]);
             fputcsv($handle, ['Bill Total (BDT)', $t['bill_totals']]);
             fputcsv($handle, ['Bill Paid (BDT)', $t['bill_paid']]);
+            fputcsv($handle, ['Bill Paid (BDT)', $t['bill_paid']]);
             fputcsv($handle, ['Bill Due (BDT)', $t['bill_due']]);
+            fputcsv($handle, ['Get Back (BDT)', $t['get_back']]);
             fputcsv($handle, []);
 
             // Per-student table
-            fputcsv($handle, ['Student', 'Room', 'Lunches', 'Dinners', 'Total Meals', 'Meal Cost', 'Wallet Credits', 'Bill Total', 'Bill Paid', 'Bill Due', 'Balance']);
+            fputcsv($handle, ['Student', 'Room', 'Total Meals', 'Meal Cost', 'Wallet Credits', 'Bill Total', 'Bill Paid', 'Bill Due', 'Get Back', 'Balance']);
             foreach ($data['students'] as $s) {
                 fputcsv($handle, [
                     $s['name'], $s['room_number'],
-                    $s['lunches'], $s['dinners'], $s['total_meals'],
+                    $s['total_meals'],
                     number_format($s['meal_cost'], 2),
                     number_format($s['wallet_credits'], 2),
                     number_format($s['bill_total'], 2),
                     number_format($s['bill_paid'], 2),
                     number_format($s['bill_due'], 2),
+                    number_format($s['get_back'], 2),
                     number_format($s['balance'], 2),
                 ]);
             }
@@ -187,8 +195,9 @@ class ReportController extends Controller
 
         for ($i = 1; $i <= 12; $i++) {
             $m = sprintf('%s-%02d', $year, $i);
-            $income = Payment::whereYear('paid_at', $year)->whereMonth('paid_at', $i)->sum('amount');
-            $expense = Expense::whereYear('expense_date', $year)->whereMonth('expense_date', $i)->sum('amount');
+            $income = (float) Transaction::where('type', 'credit')
+                ->whereYear('created_at', $year)->whereMonth('created_at', $i)->sum('amount');
+            $expense = (float) Expense::whereYear('expense_date', $year)->whereMonth('expense_date', $i)->sum('amount');
             $months[] = [
                 'month' => $m,
                 'income' => $income,

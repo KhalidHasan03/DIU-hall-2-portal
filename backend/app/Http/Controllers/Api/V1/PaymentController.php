@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\MealAttendance;
 use App\Models\MonthlyBill;
 use App\Models\Payment;
-use App\Models\Setting;
 use App\Models\Student;
 use App\Models\Transaction;
+use App\Services\MealRateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -41,16 +41,46 @@ class PaymentController extends Controller
         ]);
 
         $validated['recorded_by'] = $request->user()->id;
-        $payment = Payment::create($validated);
 
-        $bill = MonthlyBill::find($validated['monthly_bill_id']);
-        $paidTotal = $bill->payments()->sum('amount');
+        $payment = DB::transaction(function () use ($validated, $request) {
+            $payment = Payment::create($validated);
 
-        if ($paidTotal >= $bill->total_amount) {
-            $bill->update(['status' => 'paid']);
-        } elseif ($paidTotal > 0) {
-            $bill->update(['status' => 'partial']);
-        }
+            $student = Student::findOrFail($validated['student_id']);
+            $balanceBefore = (float) $student->balance;
+            $student->increment('balance', $validated['amount']);
+            $student->refresh();
+            $balanceAfter = (float) $student->balance;
+
+            if ($balanceAfter >= 0) {
+                $student->update(['meal_debt' => 0]);
+            } else {
+                $student->update(['meal_debt' => abs($balanceAfter)]);
+            }
+
+            Transaction::create([
+                'student_id' => $student->id,
+                'type' => 'credit',
+                'amount' => $validated['amount'],
+                'balance_before' => $balanceBefore,
+                'balance_after' => $balanceAfter,
+                'description' => $validated['notes'] ?? 'Bill payment',
+                'reference_type' => 'bill_payment',
+                'reference_id' => $payment->id,
+                'created_by' => $request->user()->id,
+            ]);
+
+            $bill = MonthlyBill::find($validated['monthly_bill_id']);
+            if ($bill) {
+                $walletAfter = (float) $student->balance;
+                if ($walletAfter >= (float) $bill->total_amount) {
+                    $bill->update(['status' => 'paid']);
+                } elseif ($walletAfter > 0) {
+                    $bill->update(['status' => 'partial']);
+                }
+            }
+
+            return $payment;
+        });
 
         return response()->json($payment, 201);
     }
@@ -76,7 +106,11 @@ class PaymentController extends Controller
 
         $totalWalletCredits = Transaction::where('type', 'credit')->sum('amount');
         $totalMealDeductions = Transaction::where('type', 'debit')->sum('amount');
-        $totalBillCollections = Payment::sum('amount');
+        $totalDues = MonthlyBill::get()->sum(function ($bill) {
+            $student = $bill->student;
+            $wallet = $student ? (float) $student->balance : 0;
+            return max(0, (float) $bill->total_amount - $wallet);
+        });
 
         $monthWalletCredits = Transaction::where('type', 'credit')
             ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
@@ -84,11 +118,8 @@ class PaymentController extends Controller
         $monthMealDeductions = Transaction::where('type', 'debit')
             ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
             ->sum('amount');
-        $monthBillCollections = Payment::whereYear('paid_at', $year)->whereMonth('paid_at', $monthNum)
-            ->sum('amount');
 
-        $lunchPrice = (float) (Setting::where('key', 'lunch_price')->value('value') ?? 50);
-        $dinnerPrice = (float) (Setting::where('key', 'dinner_price')->value('value') ?? 60);
+        $mealRate = MealRateService::calculate($month);
 
         $students = Student::where('status', 'approved')->with('user')->get()->map(function ($s) {
             return [
@@ -96,55 +127,37 @@ class PaymentController extends Controller
                 'name' => $s->user->name,
                 'room_number' => $s->room_number,
                 'balance' => (float) $s->balance,
+                'meal_debt' => (float) $s->meal_debt,
             ];
         });
 
-        $recentActivity = collect();
-
-        Transaction::with('student.user', 'creator')
+        $recentActivity = Transaction::with('student.user', 'creator')
             ->where('type', 'credit')
-            ->latest()->take(10)->get()
-            ->each(function ($t) use (&$recentActivity) {
-                $recentActivity->push([
+            ->latest()->take(15)->get()
+            ->map(function ($t) {
+                return [
                     'id' => 'txn-' . $t->id,
                     'type' => 'wallet_credit',
-                    'student_name' => $t->student->user->name ?? 'Unknown',
+                    'student_name' => $t->student?->user?->name ?? 'Unknown',
                     'amount' => (float) $t->amount,
-                    'description' => $t->description ?? 'Advance payment',
+                    'description' => $t->description ?? 'Wallet credit',
                     'created_at' => $t->created_at,
-                ]);
+                ];
             });
-
-        Payment::with('student.user')
-            ->latest('paid_at')->take(10)->get()
-            ->each(function ($p) use (&$recentActivity) {
-                $recentActivity->push([
-                    'id' => 'pay-' . $p->id,
-                    'type' => 'bill_payment',
-                    'student_name' => $p->student->user->name ?? 'Unknown',
-                    'amount' => (float) $p->amount,
-                    'description' => 'Bill payment (' . ($p->monthlyBill->month ?? 'N/A') . ')',
-                    'created_at' => $p->paid_at,
-                ]);
-            });
-
-        $recentActivity = $recentActivity->sortByDesc('created_at')->values()->take(15);
 
         return response()->json([
             'totals' => [
                 'wallet_credits' => $totalWalletCredits,
                 'meal_deductions' => $totalMealDeductions,
-                'bill_collections' => $totalBillCollections,
-                'net_wallet_in_use' => $totalWalletCredits - $totalMealDeductions,
+                'total_due' => $totalDues,
+                'net_receivable' => $totalWalletCredits - $totalMealDeductions,
             ],
             'monthly' => [
                 'wallet_credits' => $monthWalletCredits,
                 'meal_deductions' => $monthMealDeductions,
-                'bill_collections' => $monthBillCollections,
             ],
             'prices' => [
-                'lunch' => $lunchPrice,
-                'dinner' => $dinnerPrice,
+                'meal_rate' => $mealRate,
             ],
             'students' => $students,
             'recent_activity' => $recentActivity,
@@ -164,15 +177,24 @@ class PaymentController extends Controller
         $student = Student::findOrFail($validated['student_id']);
 
         DB::transaction(function () use ($student, $validated, $request) {
-            $balanceBefore = $student->balance;
+            $balanceBefore = (float) $student->balance;
             $student->increment('balance', $validated['amount']);
+
+            $student->refresh();
+            $balanceAfter = (float) $student->balance;
+
+            if ($balanceAfter >= 0) {
+                $student->update(['meal_debt' => 0]);
+            } else {
+                $student->update(['meal_debt' => abs($balanceAfter)]);
+            }
 
             Transaction::create([
                 'student_id' => $student->id,
                 'type' => 'credit',
                 'amount' => $validated['amount'],
                 'balance_before' => $balanceBefore,
-                'balance_after' => $student->fresh()->balance,
+                'balance_after' => $balanceAfter,
                 'description' => $validated['notes'] ?? 'Advance payment',
                 'reference_type' => 'advance_payment',
                 'created_by' => $request->user()->id,

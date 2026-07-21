@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { getLocalDateString } from '../../utils/dateUtils';
 
 export default function ManagerMenusPage() {
   const [menus, setMenus] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], meal_type: 'lunch', menu_text: '' });
+  const [form, setForm] = useState({ date: getLocalDateString(), meal_type: 'lunch', menu_text: '' });
 
   const fetchMenus = () => {
     setLoading(true);
-    api.get('/manager/menus').then(({ data }) => setMenus(data.data || data)).finally(() => setLoading(false));
+    api.get('/manager/menus').then(({ data }) => setMenus(data.data || data)).catch(() => toast.error('Failed to load menus')).finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchMenus(); }, []);
@@ -22,7 +23,7 @@ export default function ManagerMenusPage() {
       await api.post('/manager/menus', form);
       toast.success('Menu added!');
       setShowForm(false);
-      setForm({ date: new Date().toISOString().split('T')[0], meal_type: 'lunch', menu_text: '' });
+      setForm({ date: getLocalDateString(), meal_type: 'lunch', menu_text: '' });
       fetchMenus();
     } catch { toast.error('Failed to add menu'); }
   };

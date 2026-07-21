@@ -36,6 +36,7 @@ const menuItems: Record<string, { label: string; path: string; icon: string }[]>
     { label: 'My Meals', path: '/dashboard/student/meals', icon: '🍳' },
     { label: 'Payments', path: '/dashboard/student/payments', icon: '💳' },
     { label: 'Wallet', path: '/dashboard/student/wallet', icon: '👛' },
+    { label: 'Due List', path: '/dashboard/student/due-list', icon: '⚠️' },
     { label: 'Notices', path: '/dashboard/notices', icon: '📢' },
     { label: 'Profile', path: '/dashboard/profile', icon: '👤' },
   ],

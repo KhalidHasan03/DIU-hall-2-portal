@@ -11,8 +11,7 @@ class SettingsSeeder extends Seeder
     {
         $settings = [
             ['key' => 'hostel_name', 'value' => 'DIU Hall Management', 'type' => 'string', 'group' => 'general'],
-            ['key' => 'lunch_price', 'value' => '50', 'type' => 'integer', 'group' => 'meal'],
-            ['key' => 'dinner_price', 'value' => '60', 'type' => 'integer', 'group' => 'meal'],
+            ['key' => 'meal_rate', 'value' => '0', 'type' => 'decimal', 'group' => 'meal'],
             ['key' => 'monthly_fee', 'value' => '2000', 'type' => 'integer', 'group' => 'fee'],
             ['key' => 'meal_deadline_hours', 'value' => '2', 'type' => 'integer', 'group' => 'meal'],
             ['key' => 'currency', 'value' => 'BDT', 'type' => 'string', 'group' => 'general'],

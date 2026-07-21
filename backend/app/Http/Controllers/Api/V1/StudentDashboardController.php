@@ -7,6 +7,8 @@ use App\Models\DailyMenu;
 use App\Models\MealAttendance;
 use App\Models\MonthlyBill;
 use App\Models\Notice;
+use App\Models\Student;
+use App\Services\MealRateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,7 +18,8 @@ class StudentDashboardController extends Controller
     {
         $student = $request->user()->student;
         $today = now()->toDateString();
-        $month = now()->format('Y-m');
+        $month = $request->input('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
 
         $todayMenus = DailyMenu::where('date', $today)->get();
         $todayMeals = collect();
@@ -40,16 +43,19 @@ class StudentDashboardController extends Controller
 
         $currentBill = null;
         $totalPaid = 0;
+        $walletBalance = $student ? (float) $student->balance : 0;
         if ($student) {
             $currentBill = MonthlyBill::where('student_id', $student->id)
                 ->where('month', $month)
                 ->first();
-            $totalPaid = $currentBill ? $currentBill->payments()->sum('amount') : 0;
+            if ($currentBill) {
+                $walletCovered = min((float) $currentBill->total_amount, $walletBalance);
+                $totalPaid = $walletCovered;
+            }
         }
 
         $mealStats = [];
         if ($student) {
-            [$year, $monthNum] = explode('-', $month);
             $totalMonthMeals = MealAttendance::where('student_id', $student->id)
                 ->whereIn('status', ['booked', 'attended'])
                 ->whereHas('dailyMenu', function ($q) use ($year, $monthNum) {
@@ -71,6 +77,26 @@ class StudentDashboardController extends Controller
             ];
         }
 
+        $mealRate = MealRateService::calculate($month);
+        $totalExpenses = (float) \App\Models\Expense::whereYear('expense_date', $year)
+            ->whereMonth('expense_date', $monthNum)->sum('amount');
+        $totalAttendedMeals = MealAttendance::where('status', 'attended')
+            ->whereHas('dailyMenu', fn($q) => $q->whereYear('date', $year)->whereMonth('date', $monthNum))
+            ->count();
+
+        $totalStudents = Student::where('status', 'approved')->count();
+        $myDueRank = null;
+        if ($student) {
+            $allDues = MonthlyBill::where('month', $month)->get()->map(function ($b) {
+                $wallet = $b->student ? (float) $b->student->balance : 0;
+                return ['student_id' => $b->student_id, 'due' => max(0, (float) $b->total_amount - $wallet)];
+            })->sortByDesc('due')->values();
+            $myDueRank = $allDues->search(function ($d) use ($student) {
+                return $d['student_id'] === $student->id;
+            });
+            $myDueRank = $myDueRank !== false ? $myDueRank + 1 : null;
+        }
+
         $notices = Notice::where('is_active', true)
             ->where(function ($q) {
                 $q->where('target_role', 'all')->orWhere('target_role', 'student');
@@ -79,7 +105,10 @@ class StudentDashboardController extends Controller
             ->take(5)
             ->get(['id', 'title', 'content', 'created_at']);
 
+        $mealDebt = $student ? (float) $student->meal_debt : 0;
+
         return response()->json([
+            'month' => $month,
             'today_meals' => $todayMealStatus,
             'lunch_status' => $todayMealStatus->firstWhere('meal_type', 'lunch')['status'] ?? null,
             'dinner_status' => $todayMealStatus->firstWhere('meal_type', 'dinner')['status'] ?? null,
@@ -89,7 +118,13 @@ class StudentDashboardController extends Controller
             'meal_stats' => $mealStats,
             'notices' => $notices,
             'student_name' => $request->user()->name,
-            'wallet_balance' => $student ? (float) $student->balance : 0,
+            'wallet_balance' => $walletBalance,
+            'meal_debt' => $mealDebt,
+            'meal_rate' => $mealRate,
+            'total_expenses' => $totalExpenses,
+            'total_attended_meals' => $totalAttendedMeals,
+            'total_students' => $totalStudents,
+            'my_due_rank' => $myDueRank,
         ]);
     }
 }

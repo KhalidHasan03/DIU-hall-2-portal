@@ -64,6 +64,9 @@ export default function ManagerStudentsPage() {
                       <span className={`font-bold ${s.balance > 0 ? 'text-emerald-600' : s.balance === 0 ? 'text-slate-400' : 'text-red-500'}`}>
                         ৳{Number(s.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
+                      {(s.meal_debt ?? 0) > 0 && (
+                        <div className="text-[10px] text-rose-500 font-medium">Debt: ৳{Number(s.meal_debt).toLocaleString()}</div>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-center">
                       <div className="flex items-center justify-center gap-2">

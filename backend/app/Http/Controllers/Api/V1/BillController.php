@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\MonthlyBill;
 use App\Models\MealAttendance;
-use App\Models\Setting;
 use App\Models\Student;
+use App\Services\MealRateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class BillController extends Controller
 {
@@ -20,8 +21,24 @@ class BillController extends Controller
         $month = $request->input('month', now()->format('Y-m'));
         $bill = MonthlyBill::where('student_id', $student->id)
             ->where('month', $month)
-            ->with('payments')
             ->first();
+
+        if (!$bill) {
+            return response()->json(null, 200);
+        }
+
+        $walletBalance = (float) $student->balance;
+        $walletCovered = min((float) $bill->total_amount, $walletBalance);
+
+        $bill->wallet_balance = $walletBalance;
+        $bill->paid_amount = $walletCovered;
+        $bill->due_amount = max(0, (float) $bill->total_amount - $walletBalance);
+
+        if ($walletBalance >= (float) $bill->total_amount) {
+            $bill->status = 'paid';
+        } elseif ($walletBalance > 0) {
+            $bill->status = 'partial';
+        }
 
         return response()->json($bill);
     }
@@ -43,38 +60,27 @@ class BillController extends Controller
     {
         $month = $request->input('month', now()->format('Y-m'));
         [$year, $monthNum] = explode('-', $month);
-        $lunchPrice = Setting::where('key', 'lunch_price')->value('value') ?? 50;
-        $dinnerPrice = Setting::where('key', 'dinner_price')->value('value') ?? 60;
+        $mealRate = MealRateService::calculate($month);
         $students = Student::where('status', 'approved')->get();
         $generated = [];
 
         foreach ($students as $student) {
-            $lunches = MealAttendance::where('student_id', $student->id)
+            $totalMeals = MealAttendance::where('student_id', $student->id)
                 ->where('status', 'attended')
                 ->whereHas('dailyMenu', function ($q) use ($year, $monthNum) {
-                    $q->where('meal_type', 'lunch')
-                      ->whereYear('date', $year)->whereMonth('date', $monthNum);
+                    $q->whereYear('date', $year)->whereMonth('date', $monthNum);
                 })->count();
 
-            $dinners = MealAttendance::where('student_id', $student->id)
-                ->where('status', 'attended')
-                ->whereHas('dailyMenu', function ($q) use ($year, $monthNum) {
-                    $q->where('meal_type', 'dinner')
-                      ->whereYear('date', $year)->whereMonth('date', $monthNum);
-                })->count();
+            $total = $totalMeals * $mealRate;
+            $walletBalance = (float) $student->balance;
 
-            $lunchAmount = $lunches * (int)$lunchPrice;
-            $dinnerAmount = $dinners * (int)$dinnerPrice;
-            $total = $lunchAmount + $dinnerAmount;
+            $status = $walletBalance >= $total ? 'paid' : ($walletBalance > 0 ? 'partial' : 'pending');
 
             $bill = MonthlyBill::updateOrCreate(
                 ['student_id' => $student->id, 'month' => $month],
                 [
-                    'total_lunches' => $lunches,
-                    'total_dinners' => $dinners,
-                    'lunch_amount' => $lunchAmount,
-                    'dinner_amount' => $dinnerAmount,
                     'total_amount' => $total,
+                    'status' => $status,
                     'generated_by' => $request->user()->id,
                 ]
             );
@@ -107,21 +113,73 @@ class BillController extends Controller
     public function dueStudents(Request $request): JsonResponse
     {
         $month = $request->input('month', now()->format('Y-m'));
-        $students = MonthlyBill::where('month', $month)
-            ->whereIn('status', ['pending', 'partial', 'overdue'])
+        $bills = MonthlyBill::where('month', $month)
             ->with('student.user')
             ->get();
 
-        return response()->json($students->map(function ($bill) {
-            $paid = $bill->payments()->sum('amount');
+        return response()->json($bills->map(function ($bill) {
+            $walletBalance = (float) ($bill->student?->balance ?? 0);
+            $paid = min((float) $bill->total_amount, $walletBalance);
             return [
                 'id' => $bill->id,
                 'student_name' => $bill->student->user->name,
                 'room_number' => $bill->student->room_number,
                 'total_amount' => $bill->total_amount,
+                'wallet_balance' => $walletBalance,
                 'paid' => $paid,
-                'due' => max(0, $bill->total_amount - $paid),
+                'due' => max(0, (float) $bill->total_amount - $walletBalance),
             ];
         }));
+    }
+
+    public function dueList(Request $request): JsonResponse
+    {
+        $month = $request->input('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+
+        $students = Student::with('user')->where('status', 'approved')->get();
+
+        $result = $students->map(function ($student) use ($month, $year, $monthNum) {
+            $bill = MonthlyBill::where('student_id', $student->id)->where('month', $month)->first();
+            $totalAmount = $bill ? (float) $bill->total_amount : 0;
+            $walletBalance = (float) $student->balance;
+            $paid = min($totalAmount, $walletBalance);
+            $due = max(0, $totalAmount - $walletBalance);
+
+            $totalMeals = MealAttendance::where('student_id', $student->id)
+                ->where('status', 'attended')
+                ->whereHas('dailyMenu', fn($q) => $q->whereYear('date', $year)->whereMonth('date', $monthNum))
+                ->count();
+
+            return [
+                'student_id' => $student->id,
+                'name' => $student->user->name,
+                'room_number' => $student->room_number,
+                'total_meals' => $totalMeals,
+                'total_amount' => $totalAmount,
+                'wallet_balance' => $walletBalance,
+                'paid' => $paid,
+                'due' => $due,
+            ];
+        });
+
+        $sorted = $result->sortByDesc('due')->values();
+
+        $ranked = $sorted->map(function ($item, $index) {
+            $item['rank'] = $index + 1;
+            return $item;
+        });
+
+        $totalDue = $ranked->sum('due');
+        $topDue = $ranked->first()['due'] ?? 0;
+        $hasDueStudents = $ranked->contains(fn($s) => $s['due'] > 0);
+
+        return response()->json([
+            'month' => $month,
+            'students' => $ranked,
+            'total_due' => $totalDue,
+            'top_due' => $topDue,
+            'has_due_students' => $hasDueStudents,
+        ]);
     }
 }

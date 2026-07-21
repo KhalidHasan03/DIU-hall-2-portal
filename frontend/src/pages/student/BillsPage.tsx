@@ -94,7 +94,11 @@ export default function StudentBillsPage() {
               <p className="text-sm md:text-lg font-semibold text-slate-800">Total Bill</p>
               <p className="text-lg md:text-2xl font-bold text-slate-800">৳{currentBill.total_amount}</p>
             </div>
-            <BillProgressBar paid={currentBill.payments?.reduce((s: number, p: any) => s + p.amount, 0) || 0} total={currentBill.total_amount} />
+            <div className="flex items-center justify-between text-xs md:text-sm text-slate-500 mb-2">
+              <span>Wallet covered: ৳{Number(currentBill.paid_amount || 0).toFixed(2)}</span>
+              <span>Due: ৳{Number(currentBill.due_amount || 0).toFixed(2)}</span>
+            </div>
+            <BillProgressBar paid={Number(currentBill.paid_amount || 0)} total={currentBill.total_amount} />
           </div>
         </div>
       ) : (

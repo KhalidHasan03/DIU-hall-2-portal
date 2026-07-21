@@ -2,23 +2,19 @@ import { useState, useEffect } from 'react';
 import api from '../../lib/axios';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { getLocalDateString } from '../../utils/dateUtils';
 
 export default function ManagerPaymentsPage() {
   const [summary, setSummary] = useState<any>(null);
-  const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
-  const [advanceForm, setAdvanceForm] = useState({ student_id: '', amount: '', payment_method: 'cash', paid_at: new Date().toISOString().split('T')[0], notes: '' });
+  const [advanceForm, setAdvanceForm] = useState({ student_id: '', amount: '', payment_method: 'cash', paid_at: getLocalDateString(), notes: '' });
 
   useEffect(() => {
-    Promise.all([
-      api.get('/manager/payments/summary'),
-      api.get('/manager/payments'),
-    ]).then(([s, p]) => {
-      setSummary(s.data);
-      setPayments(p.data.data || p.data || []);
-    }).catch(() => toast.error('Failed to load data'))
-    .finally(() => setLoading(false));
+    api.get('/manager/payments/summary')
+      .then((s) => setSummary(s.data))
+      .catch(() => toast.error('Failed to load data'))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleAdvanceSubmit = async (e: React.FormEvent) => {
@@ -27,7 +23,7 @@ export default function ManagerPaymentsPage() {
       await api.post('/manager/payments/advance', { ...advanceForm, amount: parseFloat(advanceForm.amount) });
       toast.success('Wallet credited!');
       setShowAdvanceForm(false);
-      setAdvanceForm({ student_id: '', amount: '', payment_method: 'cash', paid_at: new Date().toISOString().split('T')[0], notes: '' });
+      setAdvanceForm({ student_id: '', amount: '', payment_method: 'cash', paid_at: getLocalDateString(), notes: '' });
       const s = await api.get('/manager/payments/summary');
       setSummary(s.data);
     } catch { toast.error('Failed to record advance'); }
@@ -39,7 +35,7 @@ export default function ManagerPaymentsPage() {
   const m = summary?.monthly || {};
   const students = summary?.students || [];
   const recentActivity = summary?.recent_activity || [];
-  const prices = summary?.prices || {};
+  const mealRate = summary?.prices?.meal_rate || 0;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -48,7 +44,7 @@ export default function ManagerPaymentsPage() {
         <div className="relative">
           <p className="text-white/80 text-xs md:text-sm font-medium uppercase tracking-wider">Finance</p>
           <h1 className="text-xl md:text-3xl font-bold text-white mt-1">Payments & Wallet Overview</h1>
-          <p className="text-white/70 text-xs md:text-sm mt-1">Track wallet top-ups, meal deductions, and bill collections.</p>
+          <p className="text-white/70 text-xs md:text-sm mt-1">Wallet is the only money pool — bills are settled from wallet balance.</p>
         </div>
       </div>
 
@@ -64,14 +60,14 @@ export default function ManagerPaymentsPage() {
           <p className="text-[10px] text-slate-400">This month: ৳{Number(m.meal_deductions || 0).toLocaleString()}</p>
         </div>
         <div className="bg-white rounded-xl px-4 py-3 md:px-5 md:py-4 shadow-sm border border-slate-100">
-          <p className="text-[10px] md:text-xs text-slate-500 font-medium uppercase tracking-wider">Bill Collections</p>
-          <p className="text-lg md:text-xl font-bold text-blue-600 mt-0.5">৳{Number(t.bill_collections || 0).toLocaleString()}</p>
-          <p className="text-[10px] text-slate-400">This month: ৳{Number(m.bill_collections || 0).toLocaleString()}</p>
+          <p className="text-[10px] md:text-xs text-slate-500 font-medium uppercase tracking-wider">Total Due</p>
+          <p className="text-lg md:text-xl font-bold text-amber-600 mt-0.5">৳{Number(t.total_due || 0).toLocaleString()}</p>
+          <p className="text-[10px] text-slate-400">Net receivable: ৳{Number(t.net_receivable || 0).toLocaleString()}</p>
         </div>
         <div className="bg-white rounded-xl px-4 py-3 md:px-5 md:py-4 shadow-sm border border-slate-100">
-          <p className="text-[10px] md:text-xs text-slate-500 font-medium uppercase tracking-wider">Meal Prices</p>
-          <p className="text-lg md:text-xl font-bold text-slate-700 mt-0.5">L: ৳{prices.lunch || 50} / D: ৳{prices.dinner || 60}</p>
-          <p className="text-[10px] text-slate-400">Auto-deduction rates</p>
+          <p className="text-[10px] md:text-xs text-slate-500 font-medium uppercase tracking-wider">Meal Rate</p>
+          <p className="text-lg md:text-xl font-bold text-slate-700 mt-0.5">৳{mealRate}</p>
+          <p className="text-[10px] text-slate-400">Per meal (expenses / meals)</p>
         </div>
       </div>
 
@@ -90,7 +86,7 @@ export default function ManagerPaymentsPage() {
             <span className="w-1 h-4 bg-blue-500 rounded-full inline-block" />
             Advance Wallet Credit
           </h3>
-          <p className="text-xs text-slate-500">Instantly credits the student's wallet for meal auto-deduction.</p>
+          <p className="text-xs text-slate-500">All money received goes to the wallet — no separate bill payments needed.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Student</label>
@@ -167,7 +163,7 @@ export default function ManagerPaymentsPage() {
           <div className="p-4 md:p-6 border-b border-slate-100">
             <h2 className="font-semibold text-slate-800 text-sm md:text-base">Student Wallets</h2>
           </div>
-          {students.length === 0 ? (
+            {students.length === 0 ? (
             <div className="p-8 text-center text-slate-400 text-sm">No students</div>
           ) : (
             <div className="divide-y divide-slate-50">
@@ -177,13 +173,18 @@ export default function ManagerPaymentsPage() {
                     <p className="text-xs md:text-sm font-medium text-slate-800 truncate">{s.name}</p>
                     <p className="text-[10px] md:text-xs text-slate-400">{s.room_number}</p>
                   </div>
-                  <span className={`text-xs md:text-sm font-bold shrink-0 ml-2 ${
-                    s.balance > 50 ? 'text-emerald-600' :
-                    s.balance > 0 ? 'text-amber-600' :
-                    'text-red-500'
-                  }`}>
-                    ৳{Number(s.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span>
+                  <div className="text-right shrink-0 ml-2">
+                    <span className={`text-xs md:text-sm font-bold ${
+                      s.balance > 0 ? 'text-emerald-600' :
+                      s.balance === 0 ? 'text-slate-400' :
+                      'text-red-500'
+                    }`}>
+                      ৳{Number(s.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                    {(s.meal_debt ?? 0) > 0 && (
+                      <p className="text-[10px] text-rose-500 font-medium">Debt: ৳{Number(s.meal_debt).toLocaleString()}</p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -191,42 +192,6 @@ export default function ManagerPaymentsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 md:p-6 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-800 text-sm md:text-base">Bill Payment History ({payments.length})</h2>
-        </div>
-        {payments.length === 0 ? (
-          <div className="p-10 text-center">
-            <span className="text-3xl block mb-2">💳</span>
-            <p className="text-slate-400 text-sm">No bill payments recorded</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wider">Student</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wider">Floor</th>
-                  <th className="text-right px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wider">Amount</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wider">Method</th>
-                  <th className="text-left px-4 py-3 font-medium text-slate-500 text-xs uppercase tracking-wider">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map((p: any) => (
-                  <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-3.5 text-slate-700 font-medium">{p.student?.user?.name || 'Unknown'}</td>
-                    <td className="px-4 py-3.5 text-slate-500">{p.student?.room_number || '-'}</td>
-                    <td className="px-4 py-3.5 text-right font-bold text-emerald-600">+ ৳{Number(p.amount).toLocaleString()}</td>
-                    <td className="px-4 py-3.5"><span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 capitalize">{p.payment_method?.replace('_', ' ')}</span></td>
-                    <td className="px-4 py-3.5 text-slate-500 whitespace-nowrap">{new Date(p.paid_at).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

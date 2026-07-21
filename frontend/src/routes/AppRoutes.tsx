@@ -9,6 +9,7 @@ import StudentMenuPage from '../pages/student/MenuPage';
 import StudentMealsPage from '../pages/student/MealsPage';
 import StudentPaymentsPage from '../pages/student/PaymentsPage';
 import StudentWalletPage from '../pages/student/WalletPage';
+import StudentDueListPage from '../pages/student/DueListPage';
 
 import ManagerDashboard from '../pages/manager/Dashboard';
 import ManagerMenusPage from '../pages/manager/MenusPage';
@@ -80,6 +81,7 @@ function StudentRoutes() {
       <Route path="meals" element={<StudentMealsPage />} />
       <Route path="payments" element={<StudentPaymentsPage />} />
       <Route path="wallet" element={<StudentWalletPage />} />
+      <Route path="due-list" element={<StudentDueListPage />} />
     </Routes>
   );
 }

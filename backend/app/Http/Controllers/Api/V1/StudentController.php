@@ -177,6 +177,7 @@ class StudentController extends Controller
                 'room_number' => $student->room_number,
                 'status' => $student->status,
                 'balance' => (float) $student->balance,
+                'meal_debt' => (float) $student->meal_debt,
                 'lunch_today' => $lunchToday,
                 'dinner_today' => $dinnerToday,
                 'month_lunches' => $monthLunches,

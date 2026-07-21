@@ -38,8 +38,9 @@ export default function StudentMealsPage() {
       await api.post('/student/meals/toggle', { meal_type: mealType, action });
       toast.success(action === 'on' ? 'Meal turned ON' : 'Meal turned OFF', { icon: '🍽️' });
       fetchData();
-    } catch {
-      toast.error('Failed to toggle meal');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Failed to toggle meal';
+      toast.error(msg);
     } finally {
       setBookingId(null);
     }
