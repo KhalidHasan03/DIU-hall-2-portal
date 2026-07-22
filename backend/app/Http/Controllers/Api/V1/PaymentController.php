@@ -8,6 +8,7 @@ use App\Models\MonthlyBill;
 use App\Models\Payment;
 use App\Models\Student;
 use App\Models\Transaction;
+use App\Services\ActivityLogger;
 use App\Services\MealRateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -46,10 +47,10 @@ class PaymentController extends Controller
             $payment = Payment::create($validated);
 
             $student = Student::findOrFail($validated['student_id']);
-            $balanceBefore = (float) $student->balance;
-            $student->increment('balance', $validated['amount']);
+            $balanceBefore = round((float) $student->balance, 2);
+            $student->increment('balance', round((float) $validated['amount'], 2));
             $student->refresh();
-            $balanceAfter = (float) $student->balance;
+            $balanceAfter = round((float) $student->balance, 2);
 
             if ($balanceAfter >= 0) {
                 $student->update(['meal_debt' => 0]);
@@ -79,6 +80,16 @@ class PaymentController extends Controller
                 }
             }
 
+            ActivityLogger::log(
+                $request->user(),
+                "recorded payment of {$validated['amount']} for {$student->user->name}",
+                'payment',
+                $payment->id,
+                null,
+                $validated,
+                $request
+            );
+
             return $payment;
         });
 
@@ -104,20 +115,20 @@ class PaymentController extends Controller
         $month = now()->format('Y-m');
         [$year, $monthNum] = explode('-', $month);
 
-        $totalWalletCredits = Transaction::where('type', 'credit')->sum('amount');
-        $totalMealDeductions = Transaction::where('type', 'debit')->sum('amount');
-        $totalDues = MonthlyBill::get()->sum(function ($bill) {
+        $totalWalletCredits = round((float) Transaction::where('type', 'credit')->sum('amount'), 2);
+        $totalMealDeductions = round((float) Transaction::where('type', 'debit')->sum('amount'), 2);
+        $totalDues = round(MonthlyBill::get()->sum(function ($bill) {
             $student = $bill->student;
-            $wallet = $student ? (float) $student->balance : 0;
-            return max(0, (float) $bill->total_amount - $wallet);
-        });
+            $wallet = $student ? round((float) $student->balance, 2) : 0;
+            return round(max(0, (float) $bill->total_amount - $wallet), 2);
+        }), 2);
 
-        $monthWalletCredits = Transaction::where('type', 'credit')
+        $monthWalletCredits = round((float) Transaction::where('type', 'credit')
             ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
-            ->sum('amount');
-        $monthMealDeductions = Transaction::where('type', 'debit')
+            ->sum('amount'), 2);
+        $monthMealDeductions = round((float) Transaction::where('type', 'debit')
             ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
-            ->sum('amount');
+            ->sum('amount'), 2);
 
         $mealRate = MealRateService::calculate($month);
 
@@ -126,8 +137,8 @@ class PaymentController extends Controller
                 'id' => $s->id,
                 'name' => $s->user->name,
                 'room_number' => $s->room_number,
-                'balance' => (float) $s->balance,
-                'meal_debt' => (float) $s->meal_debt,
+                'balance' => round((float) $s->balance, 2),
+                'meal_debt' => round((float) $s->meal_debt, 2),
             ];
         });
 
@@ -139,7 +150,7 @@ class PaymentController extends Controller
                     'id' => 'txn-' . $t->id,
                     'type' => 'wallet_credit',
                     'student_name' => $t->student?->user?->name ?? 'Unknown',
-                    'amount' => (float) $t->amount,
+                    'amount' => round((float) $t->amount, 2),
                     'description' => $t->description ?? 'Wallet credit',
                     'created_at' => $t->created_at,
                 ];
@@ -150,7 +161,7 @@ class PaymentController extends Controller
                 'wallet_credits' => $totalWalletCredits,
                 'meal_deductions' => $totalMealDeductions,
                 'total_due' => $totalDues,
-                'net_receivable' => $totalWalletCredits - $totalMealDeductions,
+                'net_receivable' => round($totalWalletCredits - $totalMealDeductions, 2),
             ],
             'monthly' => [
                 'wallet_credits' => $monthWalletCredits,
@@ -177,11 +188,11 @@ class PaymentController extends Controller
         $student = Student::findOrFail($validated['student_id']);
 
         DB::transaction(function () use ($student, $validated, $request) {
-            $balanceBefore = (float) $student->balance;
-            $student->increment('balance', $validated['amount']);
+            $balanceBefore = round((float) $student->balance, 2);
+            $student->increment('balance', round((float) $validated['amount'], 2));
 
             $student->refresh();
-            $balanceAfter = (float) $student->balance;
+            $balanceAfter = round((float) $student->balance, 2);
 
             if ($balanceAfter >= 0) {
                 $student->update(['meal_debt' => 0]);
@@ -201,9 +212,19 @@ class PaymentController extends Controller
             ]);
         });
 
+        ActivityLogger::log(
+            $request->user(),
+            "recorded advance payment of {$validated['amount']} for {$student->user->name}",
+            'payment',
+            null,
+            null,
+            $validated,
+            $request
+        );
+
         return response()->json([
             'message' => 'Advance payment recorded. Wallet credited.',
-            'balance' => (float) $student->fresh()->balance,
+            'balance' => round((float) $student->fresh()->balance, 2),
         ], 201);
     }
 }

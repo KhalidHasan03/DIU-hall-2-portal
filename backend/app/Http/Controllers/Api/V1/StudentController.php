@@ -7,6 +7,7 @@ use App\Models\DailyMenu;
 use App\Models\MealAttendance;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -43,10 +44,20 @@ class StudentController extends Controller
         return response()->json($students);
     }
 
-    public function approve(Student $student): JsonResponse
+    public function approve(Request $request, Student $student): JsonResponse
     {
         $student->update(['status' => 'approved']);
         $student->user->update(['is_active' => true]);
+
+        ActivityLogger::log(
+            $request->user(),
+            "approved student {$student->user->name}",
+            'student',
+            $student->id,
+            null,
+            ['status' => 'approved'],
+            $request
+        );
 
         return response()->json(['message' => 'Student approved successfully.', 'student' => $student->fresh()->load('user')]);
     }
@@ -57,6 +68,16 @@ class StudentController extends Controller
 
         $student->update(['status' => 'rejected']);
         $student->user->update(['is_active' => false]);
+
+        ActivityLogger::log(
+            $request->user(),
+            "rejected student {$student->user->name}",
+            'student',
+            $student->id,
+            null,
+            ['status' => 'rejected', 'reason' => $request->reason],
+            $request
+        );
 
         return response()->json(['message' => 'Student rejected.', 'student' => $student->fresh()->load('user')]);
     }
@@ -94,6 +115,16 @@ class StudentController extends Controller
             'status' => 'approved',
         ]);
 
+        ActivityLogger::log(
+            $request->user(),
+            "created student {$user->name} (Room {$validated['room_number']})",
+            'student',
+            $student->id,
+            null,
+            $validated,
+            $request
+        );
+
         return response()->json($student->load('user'), 201);
     }
 
@@ -111,6 +142,7 @@ class StudentController extends Controller
             'status' => 'sometimes|in:approved,pending,rejected,inactive',
         ]);
 
+        $oldData = $student->only(array_keys($validated));
         $student->update($validated);
 
         if ($request->has('name')) {
@@ -123,13 +155,35 @@ class StudentController extends Controller
             $student->user->update(['email' => $request->email]);
         }
 
+        ActivityLogger::log(
+            $request->user(),
+            "updated student {$student->user->name}",
+            'student',
+            $student->id,
+            $oldData,
+            $validated,
+            $request
+        );
+
         return response()->json($student->fresh()->load('user'));
     }
 
-    public function destroy(Student $student): JsonResponse
+    public function destroy(Request $request, Student $student): JsonResponse
     {
+        $studentName = $student->user->name;
         $student->user->delete();
         $student->delete();
+
+        ActivityLogger::log(
+            $request->user(),
+            "deleted student {$studentName}",
+            'student',
+            $student->id,
+            null,
+            null,
+            $request
+        );
+
         return response()->json(['message' => 'Student deleted.']);
     }
 

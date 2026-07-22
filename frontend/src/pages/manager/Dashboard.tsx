@@ -111,13 +111,13 @@ export default function ManagerDashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <MgStatCard title="Total Students" value={data?.total_students || 0} icon="👨‍🎓" gradient="bg-gradient-to-br from-blue-500 to-indigo-600" />
-        <MgStatCard title="Monthly Collection" value={`৳${data?.total_collection || 0}`} sub="This month" icon="💰" gradient="bg-gradient-to-br from-emerald-500 to-teal-600" />
-        <MgStatCard title="Monthly Expenses" value={`৳${data?.total_expenses || 0}`} sub="This month" icon="💸" gradient="bg-gradient-to-br from-rose-500 to-pink-600" />
-        <MgStatCard title="Net Balance" value={`৳${Math.abs(data?.net_balance || 0)}`} sub={data?.net_balance > 0 ? 'Profit' : data?.net_balance < 0 ? 'Loss' : 'Break-even'} icon="📊" gradient={data?.net_balance > 0 ? 'bg-gradient-to-br from-violet-500 to-purple-600' : data?.net_balance < 0 ? 'bg-gradient-to-br from-red-500 to-rose-600' : 'bg-gradient-to-br from-slate-500 to-slate-600'} />
+        <MgStatCard title="Monthly Collection" value={`৳${Number(data?.total_collection || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub="This month" icon="💰" gradient="bg-gradient-to-br from-emerald-500 to-teal-600" />
+        <MgStatCard title="Monthly Expenses" value={`৳${Number(data?.total_expenses || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub="This month" icon="💸" gradient="bg-gradient-to-br from-rose-500 to-pink-600" />
+        <MgStatCard title="Net Balance" value={`৳${Math.abs(Number(data?.net_balance || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub={data?.net_balance > 0 ? 'Profit' : data?.net_balance < 0 ? 'Loss' : 'Break-even'} icon="📊" gradient={data?.net_balance > 0 ? 'bg-gradient-to-br from-violet-500 to-purple-600' : data?.net_balance < 0 ? 'bg-gradient-to-br from-red-500 to-rose-600' : 'bg-gradient-to-br from-slate-500 to-slate-600'} />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <MgStatCard title="Total Due" value={`৳${data?.total_due || 0}`} sub="This month" icon="⚠️" gradient="bg-gradient-to-br from-amber-500 to-orange-600" />
+        <MgStatCard title="Total Due" value={`৳${Number(data?.total_due || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub="This month" icon="⚠️" gradient="bg-gradient-to-br from-amber-500 to-orange-600" />
         <MgStatCard title="Total Meals" value={data?.total_monthly_meals || 0} sub="This month" icon="🍽️" gradient="bg-gradient-to-br from-teal-500 to-cyan-600" />
         <MgStatCard title="Lunch ON Today" value={`${data?.today_lunch_on || 0} / ${data?.total_students || 0}`} sub={`Cutoff: ${data?.lunch_cutoff || '12:00'}`} icon="☀️" gradient="bg-gradient-to-br from-orange-500 to-amber-600" />
         <MgStatCard title="Dinner ON Today" value={`${data?.today_dinner_on || 0} / ${data?.total_students || 0}`} sub={`Cutoff: ${data?.dinner_cutoff || '14:00'}`} icon="🌙" gradient="bg-gradient-to-br from-indigo-500 to-purple-600" />
@@ -148,7 +148,7 @@ export default function ManagerDashboard() {
                       <p className="text-xs text-slate-400">{new Date(p.created_at).toLocaleDateString('en-BD', { day: 'numeric', month: 'short' })}</p>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-emerald-600 shrink-0">+ ৳{p.amount}</span>
+                  <span className="text-sm font-bold text-emerald-600 shrink-0">+ ৳{Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               ))}
             </div>
@@ -173,7 +173,7 @@ export default function ManagerDashboard() {
                       <p className="text-xs text-slate-400 capitalize">{e.category} • {new Date(e.expense_date).toLocaleDateString('en-BD', { day: 'numeric', month: 'short' })}</p>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-rose-600 shrink-0">- ৳{e.amount}</span>
+                  <span className="text-sm font-bold text-rose-600 shrink-0">- ৳{Number(e.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               ))}
             </div>

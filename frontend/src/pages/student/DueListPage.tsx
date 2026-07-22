@@ -17,7 +17,7 @@ function FunnyWinnerBanner({ student, month }: { student: any; month: string }) 
         <p className="text-xs md:text-sm font-medium uppercase tracking-widest text-white/80">🏆 Month's Funny Winner 🏆</p>
         <h2 className="text-2xl md:text-4xl font-black mt-1 drop-shadow-lg">{student.name}</h2>
         <p className="text-lg md:text-xl font-bold mt-1 text-yellow-100">
-          ৳{Number(student.due).toLocaleString()} Due — Room {student.room_number}
+          ৳{Number(student.due).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Due — Room {student.room_number}
         </p>
         <p className="text-sm text-white/70 mt-2 max-w-md mx-auto">
           Congrats on being the <strong>most dues-endowed</strong> student of {month}! 🎉
@@ -33,7 +33,7 @@ function TopBar({ totalDue, studentCount }: { totalDue: number; studentCount: nu
     <div className="grid grid-cols-2 gap-3">
       <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
         <p className="text-[10px] md:text-xs text-slate-500 font-medium uppercase tracking-wider">Total Due Hall-Wide</p>
-        <p className="text-xl md:text-2xl font-bold text-rose-600 mt-1">৳{totalDue.toLocaleString()}</p>
+        <p className="text-xl md:text-2xl font-bold text-rose-600 mt-1">৳{totalDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
       </div>
       <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
         <p className="text-[10px] md:text-xs text-slate-500 font-medium uppercase tracking-wider">Students Listed</p>
@@ -153,11 +153,11 @@ export default function StudentDueListPage() {
                       </td>
                       <td className="px-4 py-3.5 text-slate-500">{s.room_number}</td>
                       <td className="px-4 py-3.5 text-center text-slate-600">{s.total_meals}</td>
-                      <td className="px-4 py-3.5 text-right font-medium text-slate-700">৳{Number(s.total_amount).toLocaleString()}</td>
-                      <td className="px-4 py-3.5 text-right font-medium text-emerald-600">৳{Number(s.paid).toLocaleString()}</td>
+                      <td className="px-4 py-3.5 text-right font-medium text-slate-700">৳{Number(s.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3.5 text-right font-medium text-emerald-600">৳{Number(s.paid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="px-4 py-3.5 text-right">
                         <span className={`font-bold ${s.due > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                          {s.due > 0 ? `৳${Number(s.due).toLocaleString()}` : '✓'}
+                          {s.due > 0 ? `৳${Number(s.due).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '✓'}
                         </span>
                       </td>
                     </tr>

@@ -8,6 +8,7 @@ use App\Models\MealAttendance;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\Transaction;
+use App\Services\ActivityLogger;
 use App\Services\MealRateService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -192,6 +193,18 @@ class MealController extends Controller
             }
         });
 
+        $attendedCount = collect($validated['attendances'])->filter(fn($a) => $a['status'] === 'attended')->count();
+
+        ActivityLogger::log(
+            $request->user(),
+            "marked attendance for {$attendedCount} students",
+            'meal_attendance',
+            null,
+            null,
+            ['attended_count' => $attendedCount],
+            $request
+        );
+
         return response()->json(['message' => 'Attendance marked.']);
     }
 
@@ -277,6 +290,9 @@ class MealController extends Controller
             ->where('daily_menu_id', $menu->id)
             ->first();
 
+        $student = Student::find($validated['student_id']);
+        $studentName = $student?->user?->name ?? "Student #{$validated['student_id']}";
+
         if ($validated['action'] === 'on') {
             if ($attendance && $attendance->status === 'attended') {
                 return response()->json(['message' => 'Meal already attended.'], 422);
@@ -290,6 +306,17 @@ class MealController extends Controller
                     'status' => 'booked',
                 ]);
             }
+
+            ActivityLogger::log(
+                $request->user(),
+                "turned on {$validated['meal_type']} for {$studentName}",
+                'meal_attendance',
+                $attendance->id,
+                null,
+                $validated,
+                $request
+            );
+
             return response()->json(['status' => 'booked', 'attendance_id' => $attendance->id]);
         }
 
@@ -302,6 +329,17 @@ class MealController extends Controller
         if ($attendance->status === 'booked') {
             $attendance->update(['status' => 'cancelled']);
         }
+
+        ActivityLogger::log(
+            $request->user(),
+            "turned off {$validated['meal_type']} for {$studentName}",
+            'meal_attendance',
+            $attendance->id,
+            null,
+            $validated,
+            $request
+        );
+
         return response()->json(['status' => 'cancelled', 'attendance_id' => $attendance->id]);
     }
 

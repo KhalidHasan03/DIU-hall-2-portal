@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Expense;
+use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -38,6 +39,16 @@ class ExpenseController extends Controller
         $validated['recorded_by'] = $request->user()->id;
         $expense = Expense::create($validated);
 
+        ActivityLogger::log(
+            $request->user(),
+            "added expense {$expense->category}: {$expense->description} ({$expense->amount})",
+            'expense',
+            $expense->id,
+            null,
+            $validated,
+            $request
+        );
+
         return response()->json($expense, 201);
     }
 
@@ -56,13 +67,37 @@ class ExpenseController extends Controller
             'vendor' => 'nullable|string|max:255',
         ]);
 
+        $oldData = $expense->only(array_keys($validated));
         $expense->update($validated);
+
+        ActivityLogger::log(
+            $request->user(),
+            "updated expense #{$expense->id}",
+            'expense',
+            $expense->id,
+            $oldData,
+            $validated,
+            $request
+        );
+
         return response()->json($expense);
     }
 
-    public function destroy(Expense $expense): JsonResponse
+    public function destroy(Request $request, Expense $expense): JsonResponse
     {
+        $expenseId = $expense->id;
         $expense->delete();
+
+        ActivityLogger::log(
+            $request->user(),
+            "deleted expense #{$expenseId}",
+            'expense',
+            $expenseId,
+            null,
+            null,
+            $request
+        );
+
         return response()->json(['message' => 'Expense deleted.']);
     }
 

@@ -121,16 +121,16 @@ export default function ManagerReportsPage() {
         </div>
         <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
           <p className="text-xs text-slate-500 font-medium">Wallet Activity</p>
-          <p className="text-xl md:text-2xl font-bold text-emerald-600 mt-1">৳{Number(t.wallet_credits || 0).toLocaleString()}</p>
-          <p className="text-xs text-slate-400 mt-0.5">Meal costs: ৳{Number(t.meal_costs || 0).toLocaleString()}</p>
+          <p className="text-xl md:text-2xl font-bold text-emerald-600 mt-1">৳{Number(t.wallet_credits || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          <p className="text-xs text-slate-400 mt-0.5">Meal costs: ৳{Number(t.meal_costs || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
           <p className="text-xs text-slate-500 font-medium">Bill Collection</p>
-          <p className="text-xl md:text-2xl font-bold text-blue-600 mt-1">৳{Number(t.bill_paid || 0).toLocaleString()}</p>
+          <p className="text-xl md:text-2xl font-bold text-blue-600 mt-1">৳{Number(t.bill_paid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           <p className="text-xs text-slate-400 mt-0.5">
-            Wallet-covered / ৳{Number(t.bill_totals || 0).toLocaleString()} total
-            {t.bill_due > 0 && <span className="text-rose-500"> (৳{Number(t.bill_due).toLocaleString()} due)</span>}
-            {t.get_back > 0 && <span className="text-emerald-500"> (৳{Number(t.get_back).toLocaleString()} surplus)</span>}
+            Wallet-covered / ৳{Number(t.bill_totals || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total
+            {t.bill_due > 0 && <span className="text-rose-500"> (৳{Number(t.bill_due).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} due)</span>}
+            {t.get_back > 0 && <span className="text-emerald-500"> (৳{Number(t.get_back).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} surplus)</span>}
           </p>
         </div>
       </div>
@@ -143,7 +143,7 @@ export default function ManagerReportsPage() {
           </h2>
           <span className="text-xs text-slate-400">{sortedStudents.length} student{sortedStudents.length !== 1 ? 's' : ''}</span>
         </div>
-        <p className="text-xs text-slate-400 mb-4">Meal Rate: ৳{detailed?.meal_rate || 0} per meal (total expenses ÷ total meals)</p>
+        <p className="text-xs text-slate-400 mb-4">Meal Rate: ৳{Number(detailed?.meal_rate || 0).toFixed(2)} per meal (total expenses ÷ total meals)</p>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -188,22 +188,22 @@ export default function ManagerReportsPage() {
                     <span className="font-semibold text-slate-700">{st.total_meals}</span>
                     <span className="text-slate-400"> meals</span>
                   </td>
-                  <td className="px-3 py-3.5 text-right font-medium text-slate-700">৳{Number(st.meal_cost).toLocaleString()}</td>
-                  <td className="px-3 py-3.5 text-right font-medium text-emerald-600">৳{Number(st.wallet_credits).toLocaleString()}</td>
+                  <td className="px-3 py-3.5 text-right font-medium text-slate-700">৳{Number(st.meal_cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-3.5 text-right font-medium text-emerald-600">৳{Number(st.wallet_credits).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-3 py-3.5 text-right">
                     <span className={`font-bold ${st.balance > 0 ? 'text-emerald-600' : st.balance === 0 ? 'text-slate-400' : 'text-red-500'}`}>
                       ৳{Number(st.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                   </td>
-                  <td className="px-3 py-3.5 text-right font-medium text-slate-700">৳{Number(st.bill_total).toLocaleString()}</td>
+                  <td className="px-3 py-3.5 text-right font-medium text-slate-700">৳{Number(st.bill_total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-3 py-3.5 text-right">
                     <span className={`font-semibold ${st.bill_due > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      {st.bill_due > 0 ? `৳${Number(st.bill_due).toLocaleString()}` : '✓'}
+                      {st.bill_due > 0 ? `৳${Number(st.bill_due).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '✓'}
                     </span>
                   </td>
                   <td className="px-3 py-3.5 text-right">
                     {st.get_back > 0 ? (
-                      <span className="font-semibold text-emerald-600">৳{Number(st.get_back).toLocaleString()}</span>
+                      <span className="font-semibold text-emerald-600">৳{Number(st.get_back).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     ) : (
                       <span className="text-slate-300">—</span>
                     )}
@@ -230,24 +230,24 @@ export default function ManagerReportsPage() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
             <p className="text-xs text-emerald-700 font-medium">Collected (Wallet)</p>
-            <p className="text-lg font-bold text-emerald-800">৳{Number(s.total_collected || 0).toLocaleString()}</p>
+            <p className="text-lg font-bold text-emerald-800">৳{Number(s.total_collected || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="p-3 rounded-xl bg-rose-50 border border-rose-200">
             <p className="text-xs text-rose-700 font-medium">Expenses</p>
-            <p className="text-lg font-bold text-rose-800">৳{Number(s.total_expenses || 0).toLocaleString()}</p>
+            <p className="text-lg font-bold text-rose-800">৳{Number(s.total_expenses || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="p-3 rounded-xl bg-blue-50 border border-blue-200">
             <p className="text-xs text-blue-700 font-medium">Wallet Credits</p>
-            <p className="text-lg font-bold text-blue-800">৳{Number(t.wallet_credits || 0).toLocaleString()}</p>
+            <p className="text-lg font-bold text-blue-800">৳{Number(t.wallet_credits || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="p-3 rounded-xl bg-violet-50 border border-violet-200">
             <p className="text-xs text-violet-700 font-medium">Surplus (Get Back)</p>
-            <p className="text-lg font-bold text-violet-800">৳{Number(s.total_get_back || t.get_back || 0).toLocaleString()}</p>
+            <p className="text-lg font-bold text-violet-800">৳{Number(s.total_get_back || t.get_back || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className={`p-3 rounded-xl border ${(s.net_profit || 0) >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
             <p className={`text-xs font-medium ${(s.net_profit || 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>Net Profit</p>
             <p className={`text-lg font-bold ${(s.net_profit || 0) >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
-              ৳{Number(s.net_profit || 0).toLocaleString()}
+              ৳{Number(s.net_profit || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
         </div>

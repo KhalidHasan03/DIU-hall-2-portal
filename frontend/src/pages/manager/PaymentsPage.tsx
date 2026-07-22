@@ -51,22 +51,22 @@ export default function ManagerPaymentsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <div className="bg-white rounded-xl px-4 py-3 md:px-5 md:py-4 shadow-sm border border-slate-100">
           <p className="text-[10px] md:text-xs text-slate-500 font-medium uppercase tracking-wider">Wallet Top-Ups</p>
-          <p className="text-lg md:text-xl font-bold text-emerald-600 mt-0.5">৳{Number(t.wallet_credits || 0).toLocaleString()}</p>
-          <p className="text-[10px] text-slate-400">This month: ৳{Number(m.wallet_credits || 0).toLocaleString()}</p>
+          <p className="text-lg md:text-xl font-bold text-emerald-600 mt-0.5">৳{Number(t.wallet_credits || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          <p className="text-[10px] text-slate-400">This month: ৳{Number(m.wallet_credits || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-white rounded-xl px-4 py-3 md:px-5 md:py-4 shadow-sm border border-slate-100">
           <p className="text-[10px] md:text-xs text-slate-500 font-medium uppercase tracking-wider">Meal Deductions</p>
-          <p className="text-lg md:text-xl font-bold text-red-500 mt-0.5">৳{Number(t.meal_deductions || 0).toLocaleString()}</p>
-          <p className="text-[10px] text-slate-400">This month: ৳{Number(m.meal_deductions || 0).toLocaleString()}</p>
+          <p className="text-lg md:text-xl font-bold text-red-500 mt-0.5">৳{Number(t.meal_deductions || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          <p className="text-[10px] text-slate-400">This month: ৳{Number(m.meal_deductions || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-white rounded-xl px-4 py-3 md:px-5 md:py-4 shadow-sm border border-slate-100">
           <p className="text-[10px] md:text-xs text-slate-500 font-medium uppercase tracking-wider">Total Due</p>
-          <p className="text-lg md:text-xl font-bold text-amber-600 mt-0.5">৳{Number(t.total_due || 0).toLocaleString()}</p>
-          <p className="text-[10px] text-slate-400">Net receivable: ৳{Number(t.net_receivable || 0).toLocaleString()}</p>
+          <p className="text-lg md:text-xl font-bold text-amber-600 mt-0.5">৳{Number(t.total_due || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          <p className="text-[10px] text-slate-400">Net receivable: ৳{Number(t.net_receivable || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-white rounded-xl px-4 py-3 md:px-5 md:py-4 shadow-sm border border-slate-100">
           <p className="text-[10px] md:text-xs text-slate-500 font-medium uppercase tracking-wider">Meal Rate</p>
-          <p className="text-lg md:text-xl font-bold text-slate-700 mt-0.5">৳{mealRate}</p>
+          <p className="text-lg md:text-xl font-bold text-slate-700 mt-0.5">৳{Number(mealRate).toFixed(2)}</p>
           <p className="text-[10px] text-slate-400">Per meal (expenses / meals)</p>
         </div>
       </div>
@@ -93,7 +93,7 @@ export default function ManagerPaymentsPage() {
               <select value={advanceForm.student_id} onChange={e => setAdvanceForm({...advanceForm, student_id: e.target.value})} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none" required>
                 <option value="">Select student</option>
                 {students.map((s: any) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.room_number}) — Bal: ৳{Number(s.balance).toFixed(0)}</option>
+                  <option key={s.id} value={s.id}>{s.name} ({s.room_number}) — Bal: ৳{Number(s.balance).toFixed(2)}</option>
                 ))}
               </select>
             </div>
@@ -149,7 +149,7 @@ export default function ManagerPaymentsPage() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className={`text-xs md:text-sm font-bold ${a.type === 'wallet_credit' ? 'text-emerald-600' : 'text-blue-600'}`}>
-                      + ৳{Number(a.amount).toLocaleString()}
+                      + ৳{Number(a.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     <p className="text-[10px] text-slate-400">{new Date(a.created_at).toLocaleDateString('en-BD', { day: 'numeric', month: 'short' })}</p>
                   </div>
@@ -182,7 +182,7 @@ export default function ManagerPaymentsPage() {
                       ৳{Number(s.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                     {(s.meal_debt ?? 0) > 0 && (
-                      <p className="text-[10px] text-rose-500 font-medium">Debt: ৳{Number(s.meal_debt).toLocaleString()}</p>
+                      <p className="text-[10px] text-rose-500 font-medium">Debt: ৳{Number(s.meal_debt).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     )}
                   </div>
                 </div>

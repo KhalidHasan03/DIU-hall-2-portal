@@ -20,18 +20,18 @@ class ReportController extends Controller
         $month = $request->input('month', now()->format('Y-m'));
         [$year, $monthNum] = explode('-', $month);
 
-        $totalBills = MonthlyBill::where('month', $month)->sum('total_amount');
-        $totalWalletCredits = Transaction::where('type', 'credit')
+        $totalBills = round((float) MonthlyBill::where('month', $month)->sum('total_amount'), 2);
+        $totalWalletCredits = round((float) Transaction::where('type', 'credit')
             ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
-            ->sum('amount');
-        $totalExpenses = Expense::whereYear('expense_date', $year)->whereMonth('expense_date', $monthNum)->sum('amount');
+            ->sum('amount'), 2);
+        $totalExpenses = round((float) Expense::whereYear('expense_date', $year)->whereMonth('expense_date', $monthNum)->sum('amount'), 2);
         $studentCount = MonthlyBill::where('month', $month)->count();
         $paidCount = MonthlyBill::where('month', $month)->where('status', 'paid')->count();
         $pendingCount = MonthlyBill::where('month', $month)->whereIn('status', ['pending', 'partial', 'overdue'])->count();
 
-        $totalMealDeductions = Transaction::where('type', 'debit')
+        $totalMealDeductions = round((float) Transaction::where('type', 'debit')
             ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
-            ->sum('amount');
+            ->sum('amount'), 2);
 
         // Wallet-based due: for each student, bill_total - wallet_balance (if positive)
         $students = Student::where('status', 'approved')->get();
@@ -40,11 +40,13 @@ class ReportController extends Controller
         foreach ($students as $student) {
             $bill = MonthlyBill::where('student_id', $student->id)->where('month', $month)->first();
             if (!$bill) continue;
-            $wallet = (float) $student->balance;
-            $billTotal = (float) $bill->total_amount;
-            $totalDue += max(0, $billTotal - $wallet);
-            $totalGetBack += max(0, $wallet - $billTotal);
+            $wallet = round((float) $student->balance, 2);
+            $billTotal = round((float) $bill->total_amount, 2);
+            $totalDue += round(max(0, $billTotal - $wallet), 2);
+            $totalGetBack += round(max(0, $wallet - $billTotal), 2);
         }
+        $totalDue = round($totalDue, 2);
+        $totalGetBack = round($totalGetBack, 2);
 
         $totalLunches = MealAttendance::where('status', 'attended')
             ->whereHas('dailyMenu', fn($q) => $q->where('meal_type', 'lunch')->whereYear('date', $year)->whereMonth('date', $monthNum))
@@ -58,7 +60,7 @@ class ReportController extends Controller
             'total_bills' => $totalBills,
             'total_collected' => $totalWalletCredits,
             'total_expenses' => $totalExpenses,
-            'net_profit' => $totalWalletCredits - $totalExpenses,
+            'net_profit' => round($totalWalletCredits - $totalExpenses, 2),
             'total_students' => $studentCount,
             'paid_students' => $paidCount,
             'pending_students' => $pendingCount,
@@ -88,19 +90,19 @@ class ReportController extends Controller
                 ->whereHas('dailyMenu', fn($q) => $q->whereYear('date', $year)->whereMonth('date', $monthNum))
                 ->count();
 
-            $mealCost = $totalMeals * $mealRate;
+            $mealCost = round($totalMeals * $mealRate, 2);
 
-            $walletCredits = Transaction::where('student_id', $student->id)
+            $walletCredits = round((float) Transaction::where('student_id', $student->id)
                 ->where('type', 'credit')
                 ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)
-                ->sum('amount');
+                ->sum('amount'), 2);
 
-            $walletBalance = (float) $student->balance;
+            $walletBalance = round((float) $student->balance, 2);
             $bill = MonthlyBill::where('student_id', $student->id)->where('month', $month)->first();
-            $billTotal = $bill ? (float) $bill->total_amount : 0;
-            $billPaid = min($billTotal, $walletBalance);
-            $billDue = max(0, $billTotal - $walletBalance);
-            $getBack = max(0, $walletBalance - $billTotal);
+            $billTotal = $bill ? round((float) $bill->total_amount, 2) : 0;
+            $billPaid = round(min($billTotal, $walletBalance), 2);
+            $billDue = round(max(0, $billTotal - $walletBalance), 2);
+            $getBack = round(max(0, $walletBalance - $billTotal), 2);
 
             $result[] = [
                 'id' => $student->id,
@@ -125,12 +127,12 @@ class ReportController extends Controller
             'totals' => [
                 'students' => count($result),
                 'total_meals' => collect($result)->sum('total_meals'),
-                'meal_costs' => collect($result)->sum('meal_cost'),
-                'wallet_credits' => collect($result)->sum('wallet_credits'),
-                'bill_totals' => collect($result)->sum('bill_total'),
-                'bill_paid' => collect($result)->sum('bill_paid'),
-                'bill_due' => collect($result)->sum('bill_due'),
-                'get_back' => collect($result)->sum('get_back'),
+                'meal_costs' => round(collect($result)->sum('meal_cost'), 2),
+                'wallet_credits' => round(collect($result)->sum('wallet_credits'), 2),
+                'bill_totals' => round(collect($result)->sum('bill_total'), 2),
+                'bill_paid' => round(collect($result)->sum('bill_paid'), 2),
+                'bill_due' => round(collect($result)->sum('bill_due'), 2),
+                'get_back' => round(collect($result)->sum('get_back'), 2),
             ],
         ]);
     }
@@ -195,9 +197,9 @@ class ReportController extends Controller
 
         for ($i = 1; $i <= 12; $i++) {
             $m = sprintf('%s-%02d', $year, $i);
-            $income = (float) Transaction::where('type', 'credit')
-                ->whereYear('created_at', $year)->whereMonth('created_at', $i)->sum('amount');
-            $expense = (float) Expense::whereYear('expense_date', $year)->whereMonth('expense_date', $i)->sum('amount');
+            $income = round((float) Transaction::where('type', 'credit')
+                ->whereYear('created_at', $year)->whereMonth('created_at', $i)->sum('amount'), 2);
+            $expense = round((float) Expense::whereYear('expense_date', $year)->whereMonth('expense_date', $i)->sum('amount'), 2);
             $months[] = [
                 'month' => $m,
                 'income' => $income,

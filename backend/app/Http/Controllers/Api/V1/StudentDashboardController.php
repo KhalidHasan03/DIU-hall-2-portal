@@ -43,13 +43,13 @@ class StudentDashboardController extends Controller
 
         $currentBill = null;
         $totalPaid = 0;
-        $walletBalance = $student ? (float) $student->balance : 0;
+        $walletBalance = $student ? round((float) $student->balance, 2) : 0;
         if ($student) {
             $currentBill = MonthlyBill::where('student_id', $student->id)
                 ->where('month', $month)
                 ->first();
             if ($currentBill) {
-                $walletCovered = min((float) $currentBill->total_amount, $walletBalance);
+                $walletCovered = round(min((float) $currentBill->total_amount, $walletBalance), 2);
                 $totalPaid = $walletCovered;
             }
         }
@@ -78,8 +78,8 @@ class StudentDashboardController extends Controller
         }
 
         $mealRate = MealRateService::calculate($month);
-        $totalExpenses = (float) \App\Models\Expense::whereYear('expense_date', $year)
-            ->whereMonth('expense_date', $monthNum)->sum('amount');
+        $totalExpenses = round((float) \App\Models\Expense::whereYear('expense_date', $year)
+            ->whereMonth('expense_date', $monthNum)->sum('amount'), 2);
         $totalAttendedMeals = MealAttendance::where('status', 'attended')
             ->whereHas('dailyMenu', fn($q) => $q->whereYear('date', $year)->whereMonth('date', $monthNum))
             ->count();
@@ -88,8 +88,8 @@ class StudentDashboardController extends Controller
         $myDueRank = null;
         if ($student) {
             $allDues = MonthlyBill::where('month', $month)->get()->map(function ($b) {
-                $wallet = $b->student ? (float) $b->student->balance : 0;
-                return ['student_id' => $b->student_id, 'due' => max(0, (float) $b->total_amount - $wallet)];
+                $wallet = $b->student ? round((float) $b->student->balance, 2) : 0;
+                return ['student_id' => $b->student_id, 'due' => round(max(0, (float) $b->total_amount - $wallet), 2)];
             })->sortByDesc('due')->values();
             $myDueRank = $allDues->search(function ($d) use ($student) {
                 return $d['student_id'] === $student->id;
@@ -97,15 +97,16 @@ class StudentDashboardController extends Controller
             $myDueRank = $myDueRank !== false ? $myDueRank + 1 : null;
         }
 
-        $notices = Notice::where('is_active', true)
+        $notices = Notice::with('publisher')
+            ->where('is_active', true)
             ->where(function ($q) {
                 $q->where('target_role', 'all')->orWhere('target_role', 'student');
             })
             ->latest()
             ->take(5)
-            ->get(['id', 'title', 'content', 'created_at']);
+            ->get(['id', 'title', 'content', 'created_at', 'published_by']);
 
-        $mealDebt = $student ? (float) $student->meal_debt : 0;
+        $mealDebt = $student ? round((float) $student->meal_debt, 2) : 0;
 
         return response()->json([
             'month' => $month,
@@ -113,8 +114,8 @@ class StudentDashboardController extends Controller
             'lunch_status' => $todayMealStatus->firstWhere('meal_type', 'lunch')['status'] ?? null,
             'dinner_status' => $todayMealStatus->firstWhere('meal_type', 'dinner')['status'] ?? null,
             'current_bill' => $currentBill,
-            'paid_amount' => $totalPaid,
-            'due_amount' => $currentBill ? max(0, $currentBill->total_amount - $totalPaid) : 0,
+            'paid_amount' => round($totalPaid, 2),
+            'due_amount' => $currentBill ? round(max(0, (float) $currentBill->total_amount - $totalPaid), 2) : 0,
             'meal_stats' => $mealStats,
             'notices' => $notices,
             'student_name' => $request->user()->name,

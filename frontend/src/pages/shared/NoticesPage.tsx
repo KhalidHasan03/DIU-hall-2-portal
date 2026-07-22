@@ -94,7 +94,16 @@ export default function NoticesPage() {
                     <span className="text-[10px] md:text-xs text-slate-400 whitespace-nowrap">{new Date(n.created_at).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                   </div>
                   <p className="text-xs md:text-sm text-slate-600 mt-2 leading-relaxed">{n.content}</p>
-                  <span className="inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 capitalize">{n.target_role}</span>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 capitalize">{n.target_role}</span>
+                    {n.publisher && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                        by <span className="font-medium text-slate-500">{n.publisher.name}</span>
+                        <span className="text-slate-300">|</span>
+                        <span className="capitalize">{n.publisher.role.replace('_', ' ')}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

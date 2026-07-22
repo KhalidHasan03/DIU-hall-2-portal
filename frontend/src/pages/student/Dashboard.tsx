@@ -58,9 +58,9 @@ export default function StudentDashboard() {
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner /></div>;
 
-  const dueAmount = data?.due_amount || 0;
-  const totalBill = data?.current_bill?.total_amount || 0;
-  const paidAmount = data?.paid_amount || 0;
+  const dueAmount = Number(data?.due_amount || 0);
+  const totalBill = Number(data?.current_bill?.total_amount || 0);
+  const paidAmount = Number(data?.paid_amount || 0);
   const billProgress = totalBill > 0 ? Math.round((paidAmount / totalBill) * 100) : 0;
   const isCurrentMonth = month === getLocalMonthString();
 
@@ -127,20 +127,20 @@ export default function StudentDashboard() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <StatCard title="Monthly Bill" value={`৳${totalBill}`} sub={data?.current_bill?.month ? `Period: ${data.current_bill.month}` : 'No bill yet'} gradient="bg-gradient-to-br from-emerald-500 to-teal-600" icon="🧾" />
-        <StatCard title="Paid Amount" value={`৳${paidAmount}`} sub={`${billProgress}% of total bill`} gradient="bg-gradient-to-br from-blue-500 to-indigo-600" icon="💰" />
-        <StatCard title="Due Amount" value={`৳${dueAmount}`} sub={dueAmount > 0 ? 'Payment pending' : 'All clear!'} gradient={dueAmount > 0 ? 'bg-gradient-to-br from-rose-500 to-pink-600' : 'bg-gradient-to-br from-slate-500 to-slate-600'} icon={dueAmount > 0 ? '⚠️' : '✅'} />
+        <StatCard title="Monthly Bill" value={`৳${totalBill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub={data?.current_bill?.month ? `Period: ${data.current_bill.month}` : 'No bill yet'} gradient="bg-gradient-to-br from-emerald-500 to-teal-600" icon="🧾" />
+        <StatCard title="Paid Amount" value={`৳${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub={`${billProgress}% of total bill`} gradient="bg-gradient-to-br from-blue-500 to-indigo-600" icon="💰" />
+        <StatCard title="Due Amount" value={`৳${dueAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub={dueAmount > 0 ? 'Payment pending' : 'All clear!'} gradient={dueAmount > 0 ? 'bg-gradient-to-br from-rose-500 to-pink-600' : 'bg-gradient-to-br from-slate-500 to-slate-600'} icon={dueAmount > 0 ? '⚠️' : '✅'} />
         {(data?.meal_debt ?? 0) > 0 ? (
-          <StatCard title="Meal Debt" value={`৳${(data?.meal_debt ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} sub="Outstanding meal cost" gradient="bg-gradient-to-br from-rose-500 to-pink-600" icon="📋" />
+          <StatCard title="Meal Debt" value={`৳${(data?.meal_debt ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub="Outstanding meal cost" gradient="bg-gradient-to-br from-rose-500 to-pink-600" icon="📋" />
         ) : (
-          <StatCard title="Wallet Balance" value={`৳${(data?.wallet_balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} sub="Prepaid meal fund" gradient="bg-gradient-to-br from-emerald-500 to-teal-600" icon="👛" />
+          <StatCard title="Wallet Balance" value={`৳${(data?.wallet_balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub="Prepaid meal fund" gradient="bg-gradient-to-br from-emerald-500 to-teal-600" icon="👛" />
         )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <StatCard title="Meals This Month" value={data?.meal_stats?.total || 0} sub={`${data?.meal_stats?.attended || 0} attended`} gradient="bg-gradient-to-br from-violet-500 to-purple-600" icon="🍽️" />
-        <StatCard title="Meal Rate" value={`৳${data?.meal_rate || 0}`} sub="Per meal (expenses ÷ meals)" gradient="bg-gradient-to-br from-cyan-500 to-teal-600" icon="📊" />
-        <StatCard title="Total Expenses" value={`৳${(data?.total_expenses || 0).toLocaleString()}`} sub="Hall-wide this month" gradient="bg-gradient-to-br from-orange-500 to-rose-600" icon="💸" />
+        <StatCard title="Meal Rate" value={`৳${Number(data?.meal_rate || 0).toFixed(2)}`} sub="Per meal (expenses ÷ meals)" gradient="bg-gradient-to-br from-cyan-500 to-teal-600" icon="📊" />
+        <StatCard title="Total Expenses" value={`৳${(data?.total_expenses || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub="Hall-wide this month" gradient="bg-gradient-to-br from-orange-500 to-rose-600" icon="💸" />
         <StatCard title="Total Meals Served" value={data?.total_attended_meals || 0} sub={`Across ${data?.total_students || 0} students`} gradient="bg-gradient-to-br from-purple-500 to-pink-600" icon="🍳" />
       </div>
 
@@ -154,8 +154,8 @@ export default function StudentDashboard() {
             <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700 ease-out" style={{ width: `${billProgress}%` }} />
           </div>
           <div className="flex justify-between text-[10px] md:text-xs text-slate-400 mt-2">
-            <span>Paid: ৳{paidAmount}</span>
-            <span>Total: ৳{totalBill}</span>
+            <span>Paid: ৳{paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span>Total: ৳{totalBill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
         </div>
       )}
@@ -174,6 +174,11 @@ export default function StudentDashboard() {
                   <h3 className="text-sm md:text-base font-medium text-slate-800 group-hover:text-indigo-600 transition-colors">{n.title}</h3>
                   <p className="text-xs md:text-sm text-slate-500 mt-0.5 line-clamp-2">{n.content}</p>
                   <p className="text-[10px] md:text-xs text-slate-400 mt-1">{new Date(n.created_at).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                  {n.publisher && (
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      by {n.publisher.name} <span className="text-slate-300">|</span> <span className="capitalize">{n.publisher.role.replace('_', ' ')}</span>
+                    </p>
+                  )}
                 </div>
               </div>
             ))}

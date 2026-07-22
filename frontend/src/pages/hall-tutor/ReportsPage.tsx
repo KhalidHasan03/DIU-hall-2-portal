@@ -34,19 +34,19 @@ export default function TutorReportsPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">
             <p className="text-xs text-slate-500">Total Bills</p>
-            <p className="text-lg md:text-2xl font-bold mt-1">৳{report.total_bills}</p>
+            <p className="text-lg md:text-2xl font-bold mt-1">৳{Number(report.total_bills).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">
             <p className="text-xs text-slate-500">Collected</p>
-            <p className="text-lg md:text-2xl font-bold text-emerald-600 mt-1">৳{report.total_collected}</p>
+            <p className="text-lg md:text-2xl font-bold text-emerald-600 mt-1">৳{Number(report.total_collected).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">
             <p className="text-xs text-slate-500">Expenses</p>
-            <p className="text-lg md:text-2xl font-bold text-rose-600 mt-1">৳{report.total_expenses}</p>
+            <p className="text-lg md:text-2xl font-bold text-rose-600 mt-1">৳{Number(report.total_expenses).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">
             <p className="text-xs text-slate-500">Net Profit</p>
-            <p className={`text-lg md:text-2xl font-bold mt-1 ${report.net_profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>৳{report.net_profit}</p>
+            <p className={`text-lg md:text-2xl font-bold mt-1 ${report.net_profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>৳{Number(report.net_profit).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
         </div>
       )}

@@ -22,15 +22,15 @@ class ManagerDashboardController extends Controller
         $today = now()->toDateString();
 
         $totalStudents = Student::where('status', 'approved')->count();
-        $totalCollection = Transaction::where('type', 'credit')
-            ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)->sum('amount');
-        $totalExpenses = Expense::whereYear('expense_date', $year)->whereMonth('expense_date', $monthNum)->sum('amount');
+        $totalCollection = round((float) Transaction::where('type', 'credit')
+            ->whereYear('created_at', $year)->whereMonth('created_at', $monthNum)->sum('amount'), 2);
+        $totalExpenses = round((float) Expense::whereYear('expense_date', $year)->whereMonth('expense_date', $monthNum)->sum('amount'), 2);
 
-        $totalDue = MonthlyBill::where('month', $month)->get()->sum(function ($bill) {
+        $totalDue = round(MonthlyBill::where('month', $month)->get()->sum(function ($bill) {
             $student = $bill->student;
-            $wallet = $student ? (float) $student->balance : 0;
-            return max(0, (float) $bill->total_amount - $wallet);
-        });
+            $wallet = $student ? round((float) $student->balance, 2) : 0;
+            return round(max(0, (float) $bill->total_amount - $wallet), 2);
+        }), 2);
 
         $totalMonthlyMeals = MealAttendance::whereHas('dailyMenu', function ($q) use ($year, $monthNum) {
             $q->whereYear('date', $year)->whereMonth('date', $monthNum);
@@ -60,7 +60,7 @@ class ManagerDashboardController extends Controller
             'total_students' => $totalStudents,
             'total_collection' => $totalCollection,
             'total_expenses' => $totalExpenses,
-            'net_balance' => $totalCollection - $totalExpenses,
+            'net_balance' => round($totalCollection - $totalExpenses, 2),
             'total_due' => $totalDue,
             'total_monthly_meals' => $totalMonthlyMeals,
             'pending_students' => $pendingStudents,

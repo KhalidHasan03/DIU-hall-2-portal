@@ -7,8 +7,10 @@ interface User {
   email: string;
   phone: string;
   avatar: string | null;
+  avatar_url: string | null;
   role: string;
   is_active: boolean;
+  created_at: string;
   student?: any;
 }
 

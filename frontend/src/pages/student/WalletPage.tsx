@@ -80,10 +80,10 @@ export default function WalletPage() {
                 </div>
                 <div className="text-right shrink-0 ml-2">
                   <p className={`text-sm md:text-base font-bold ${txn.type === 'credit' ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {txn.type === 'credit' ? '+' : '-'} ৳{Number(txn.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {txn.type === 'credit' ? '+' : '-'} ৳{Number(txn.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <p className="text-[10px] md:text-xs text-slate-400 mt-0.5">
-                    Balance: ৳{Number(txn.balance_after).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    Balance: ৳{Number(txn.balance_after).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>

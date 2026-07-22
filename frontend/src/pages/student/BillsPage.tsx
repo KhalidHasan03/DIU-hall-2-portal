@@ -14,8 +14,8 @@ function BillProgressBar({ paid, total }: { paid: number; total: number }) {
         <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700" style={{ width: `${pct}%` }} />
       </div>
       <div className="flex justify-between text-[10px] md:text-xs text-slate-400 mt-1.5">
-        <span>Paid: ৳{paid.toLocaleString()}</span>
-        <span>Total: ৳{total.toLocaleString()}</span>
+        <span>Paid: ৳{paid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        <span>Total: ৳{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
     </div>
   );
@@ -72,27 +72,27 @@ export default function StudentBillsPage() {
             <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-orange-50 to-orange-100/50 border border-orange-200">
               <p className="text-[10px] md:text-xs font-medium text-orange-600 uppercase tracking-wider">Lunches</p>
               <p className="text-lg md:text-2xl font-bold text-slate-800 mt-1">{currentBill.total_lunches}</p>
-              {currentBill.total_lunches > 0 && <p className="text-[10px] md:text-xs text-orange-500 mt-0.5">× ৳{(currentBill.lunch_amount / currentBill.total_lunches).toFixed(0)} each</p>}
+              {currentBill.total_lunches > 0 && <p className="text-[10px] md:text-xs text-orange-500 mt-0.5">× ৳{(currentBill.lunch_amount / currentBill.total_lunches).toFixed(2)} each</p>}
             </div>
             <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100/50 border border-indigo-200">
               <p className="text-[10px] md:text-xs font-medium text-indigo-600 uppercase tracking-wider">Dinners</p>
               <p className="text-lg md:text-2xl font-bold text-slate-800 mt-1">{currentBill.total_dinners}</p>
-              {currentBill.total_dinners > 0 && <p className="text-[10px] md:text-xs text-indigo-500 mt-0.5">× ৳{(currentBill.dinner_amount / currentBill.total_dinners).toFixed(0)} each</p>}
+              {currentBill.total_dinners > 0 && <p className="text-[10px] md:text-xs text-indigo-500 mt-0.5">× ৳{(currentBill.dinner_amount / currentBill.total_dinners).toFixed(2)} each</p>}
             </div>
             <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200">
               <p className="text-[10px] md:text-xs font-medium text-emerald-600 uppercase tracking-wider">Lunch Amount</p>
-              <p className="text-lg md:text-2xl font-bold text-slate-800 mt-1">৳{currentBill.lunch_amount}</p>
+              <p className="text-lg md:text-2xl font-bold text-slate-800 mt-1">৳{Number(currentBill.lunch_amount).toFixed(2)}</p>
             </div>
             <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-violet-50 to-violet-100/50 border border-violet-200">
               <p className="text-[10px] md:text-xs font-medium text-violet-600 uppercase tracking-wider">Dinner Amount</p>
-              <p className="text-lg md:text-2xl font-bold text-slate-800 mt-1">৳{currentBill.dinner_amount}</p>
+              <p className="text-lg md:text-2xl font-bold text-slate-800 mt-1">৳{Number(currentBill.dinner_amount).toFixed(2)}</p>
             </div>
           </div>
 
           <div className="p-4 md:p-6 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100/50 border border-slate-200">
             <div className="flex items-center justify-between mb-3 md:mb-4">
               <p className="text-sm md:text-lg font-semibold text-slate-800">Total Bill</p>
-              <p className="text-lg md:text-2xl font-bold text-slate-800">৳{currentBill.total_amount}</p>
+              <p className="text-lg md:text-2xl font-bold text-slate-800">৳{Number(currentBill.total_amount).toFixed(2)}</p>
             </div>
             <div className="flex items-center justify-between text-xs md:text-sm text-slate-500 mb-2">
               <span>Wallet covered: ৳{Number(currentBill.paid_amount || 0).toFixed(2)}</span>
@@ -138,7 +138,7 @@ export default function StudentBillsPage() {
                       <td className="px-3 md:px-4 py-3.5 text-slate-700 font-medium text-xs md:text-sm">{bill.month}</td>
                       <td className="px-3 md:px-4 py-3.5 text-slate-600 text-xs md:text-sm">{bill.total_lunches}</td>
                       <td className="px-3 md:px-4 py-3.5 text-slate-600 text-xs md:text-sm">{bill.total_dinners}</td>
-                      <td className="px-3 md:px-4 py-3.5 text-slate-700 font-medium text-xs md:text-sm">৳{bill.total_amount}</td>
+                      <td className="px-3 md:px-4 py-3.5 text-slate-700 font-medium text-xs md:text-sm">৳{Number(bill.total_amount).toFixed(2)}</td>
                       <td className="px-3 md:px-4 py-3.5">
                         <span className={`px-2 md:px-3 py-1 rounded-full text-[10px] md:text-xs font-semibold ${
                           bill.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :

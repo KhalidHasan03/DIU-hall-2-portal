@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -44,4 +45,13 @@ class User extends Authenticatable
     {
         return $this->hasOne(Student::class);
     }
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if (!$this->avatar) return null;
+        if (filter_var($this->avatar, FILTER_VALIDATE_URL)) return $this->avatar;
+        return Storage::disk('public')->url($this->avatar);
+    }
+
+    protected $appends = ['avatar_url'];
 }

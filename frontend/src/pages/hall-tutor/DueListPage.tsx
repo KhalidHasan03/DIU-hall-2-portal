@@ -54,9 +54,9 @@ export default function TutorDueListPage() {
                   <tr key={item.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-3.5 text-slate-700 font-medium">{item.student_name}</td>
                     <td className="px-4 py-3.5 text-slate-500">{item.room_number}</td>
-                    <td className="px-4 py-3.5 text-right text-slate-700">৳{item.total_amount}</td>
-                    <td className="px-4 py-3.5 text-right text-emerald-600">৳{item.paid}</td>
-                    <td className="px-4 py-3.5 text-right font-bold text-rose-600">৳{item.due}</td>
+                    <td className="px-4 py-3.5 text-right text-slate-700">৳{Number(item.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-3.5 text-right text-emerald-600">৳{Number(item.paid).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-3.5 text-right font-bold text-rose-600">৳{Number(item.due).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   </tr>
                 ))}
               </tbody>

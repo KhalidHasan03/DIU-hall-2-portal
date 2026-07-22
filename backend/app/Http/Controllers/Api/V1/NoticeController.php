@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Notice;
+use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,6 +33,16 @@ class NoticeController extends Controller
         $validated['published_by'] = $request->user()->id;
         $notice = Notice::create($validated);
 
+        ActivityLogger::log(
+            $request->user(),
+            "published notice: {$notice->title}",
+            'notice',
+            $notice->id,
+            null,
+            $validated,
+            $request
+        );
+
         return response()->json($notice, 201);
     }
 
@@ -44,13 +55,37 @@ class NoticeController extends Controller
             'is_active' => 'sometimes|boolean',
         ]);
 
+        $oldData = $notice->only(array_keys($validated));
         $notice->update($validated);
+
+        ActivityLogger::log(
+            $request->user(),
+            "updated notice: {$notice->title}",
+            'notice',
+            $notice->id,
+            $oldData,
+            $validated,
+            $request
+        );
+
         return response()->json($notice);
     }
 
-    public function destroy(Notice $notice): JsonResponse
+    public function destroy(Request $request, Notice $notice): JsonResponse
     {
+        $noticeTitle = $notice->title;
         $notice->delete();
+
+        ActivityLogger::log(
+            $request->user(),
+            "deleted notice: {$noticeTitle}",
+            'notice',
+            $notice->id,
+            null,
+            null,
+            $request
+        );
+
         return response()->json(['message' => 'Notice deleted.']);
     }
 }

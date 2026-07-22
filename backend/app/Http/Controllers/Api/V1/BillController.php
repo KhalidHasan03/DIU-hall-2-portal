@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MonthlyBill;
 use App\Models\MealAttendance;
 use App\Models\Student;
+use App\Services\ActivityLogger;
 use App\Services\MealRateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,12 +28,13 @@ class BillController extends Controller
             return response()->json(null, 200);
         }
 
-        $walletBalance = (float) $student->balance;
-        $walletCovered = min((float) $bill->total_amount, $walletBalance);
+        $walletBalance = round((float) $student->balance, 2);
+        $walletCovered = round(min((float) $bill->total_amount, $walletBalance), 2);
 
+        $bill->total_amount = round((float) $bill->total_amount, 2);
         $bill->wallet_balance = $walletBalance;
         $bill->paid_amount = $walletCovered;
-        $bill->due_amount = max(0, (float) $bill->total_amount - $walletBalance);
+        $bill->due_amount = round(max(0, (float) $bill->total_amount - $walletBalance), 2);
 
         if ($walletBalance >= (float) $bill->total_amount) {
             $bill->status = 'paid';
@@ -71,8 +73,8 @@ class BillController extends Controller
                     $q->whereYear('date', $year)->whereMonth('date', $monthNum);
                 })->count();
 
-            $total = $totalMeals * $mealRate;
-            $walletBalance = (float) $student->balance;
+            $total = round($totalMeals * $mealRate, 2);
+            $walletBalance = round((float) $student->balance, 2);
 
             $status = $walletBalance >= $total ? 'paid' : ($walletBalance > 0 ? 'partial' : 'pending');
 
@@ -87,6 +89,16 @@ class BillController extends Controller
 
             $generated[] = $bill;
         }
+
+        ActivityLogger::log(
+            $request->user(),
+            "generated {$month} bills for " . count($generated) . " students",
+            'monthly_bill',
+            null,
+            null,
+            ['month' => $month, 'count' => count($generated)],
+            $request
+        );
 
         return response()->json(['message' => 'Bills generated.', 'count' => count($generated)]);
     }
@@ -118,16 +130,16 @@ class BillController extends Controller
             ->get();
 
         return response()->json($bills->map(function ($bill) {
-            $walletBalance = (float) ($bill->student?->balance ?? 0);
-            $paid = min((float) $bill->total_amount, $walletBalance);
+            $walletBalance = round((float) ($bill->student?->balance ?? 0), 2);
+            $paid = round(min((float) $bill->total_amount, $walletBalance), 2);
             return [
                 'id' => $bill->id,
                 'student_name' => $bill->student->user->name,
                 'room_number' => $bill->student->room_number,
-                'total_amount' => $bill->total_amount,
+                'total_amount' => round((float) $bill->total_amount, 2),
                 'wallet_balance' => $walletBalance,
                 'paid' => $paid,
-                'due' => max(0, (float) $bill->total_amount - $walletBalance),
+                'due' => round(max(0, (float) $bill->total_amount - $walletBalance), 2),
             ];
         }));
     }
@@ -141,10 +153,10 @@ class BillController extends Controller
 
         $result = $students->map(function ($student) use ($month, $year, $monthNum) {
             $bill = MonthlyBill::where('student_id', $student->id)->where('month', $month)->first();
-            $totalAmount = $bill ? (float) $bill->total_amount : 0;
-            $walletBalance = (float) $student->balance;
-            $paid = min($totalAmount, $walletBalance);
-            $due = max(0, $totalAmount - $walletBalance);
+            $totalAmount = $bill ? round((float) $bill->total_amount, 2) : 0;
+            $walletBalance = round((float) $student->balance, 2);
+            $paid = round(min($totalAmount, $walletBalance), 2);
+            $due = round(max(0, $totalAmount - $walletBalance), 2);
 
             $totalMeals = MealAttendance::where('student_id', $student->id)
                 ->where('status', 'attended')
@@ -170,8 +182,8 @@ class BillController extends Controller
             return $item;
         });
 
-        $totalDue = $ranked->sum('due');
-        $topDue = $ranked->first()['due'] ?? 0;
+        $totalDue = round($ranked->sum('due'), 2);
+        $topDue = round($ranked->first()['due'] ?? 0, 2);
         $hasDueStudents = $ranked->contains(fn($s) => $s['due'] > 0);
 
         return response()->json([

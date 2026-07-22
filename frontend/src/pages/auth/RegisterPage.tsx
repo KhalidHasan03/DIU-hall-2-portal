@@ -89,7 +89,7 @@ export default function RegisterPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
-              <input name="name" value={form.name} onChange={handleChange} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" placeholder="John Doe" required />
+              <input name="name" value={form.name} onChange={handleChange} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none" placeholder="e.g. Shafi" required />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
