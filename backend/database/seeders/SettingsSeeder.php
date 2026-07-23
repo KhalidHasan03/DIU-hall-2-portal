@@ -16,6 +16,8 @@ class SettingsSeeder extends Seeder
             ['key' => 'meal_deadline_hours', 'value' => '2', 'type' => 'integer', 'group' => 'meal'],
             ['key' => 'currency', 'value' => 'BDT', 'type' => 'string', 'group' => 'general'],
             ['key' => 'max_meals_per_day', 'value' => '2', 'type' => 'integer', 'group' => 'meal'],
+            ['key' => 'lunch_cutoff_time', 'value' => '12:00', 'type' => 'string', 'group' => 'meal'],
+            ['key' => 'dinner_cutoff_time', 'value' => '14:00', 'type' => 'string', 'group' => 'meal'],
         ];
 
         foreach ($settings as $setting) {

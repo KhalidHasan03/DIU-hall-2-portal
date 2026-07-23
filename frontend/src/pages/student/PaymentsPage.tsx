@@ -13,10 +13,10 @@ export default function StudentPaymentsPage() {
       api.get('/student/wallet/history'),
     ]).then(([wallet, txns]) => {
       setWalletBalance(wallet.data.balance ?? 0);
-      const txnList = (txns.data.data || txns.data || []).map((t: any) => ({
+      const txnList = (Array.isArray(txns.data) ? txns.data : txns.data.data || []).map((t: any) => ({
         ...t,
         _date: t.created_at,
-        _label: t.type === 'credit' ? 'Wallet Top-Up' : 'Meal Deduction',
+        _label: t.description || (t.type === 'credit' ? 'Wallet Top-Up' : 'Meal Deduction'),
         _amount: t.type === 'credit' ? t.amount : -Math.abs(t.amount),
       }));
       setTransactions(txnList);

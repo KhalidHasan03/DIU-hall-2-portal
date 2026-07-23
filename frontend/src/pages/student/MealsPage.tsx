@@ -14,6 +14,7 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
 export default function StudentMealsPage() {
   const [meals, setMeals] = useState<any[]>([]);
   const [todayStatus, setTodayStatus] = useState<any[]>([]);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [bookingId, setBookingId] = useState<number | null>(null);
@@ -23,9 +24,11 @@ export default function StudentMealsPage() {
     Promise.all([
       api.get('/student/meals/history'),
       api.get('/student/meals/today-status'),
-    ]).then(([h, t]) => {
+      api.get('/student/wallet'),
+    ]).then(([h, t, w]) => {
       setMeals(h.data);
       setTodayStatus(t.data);
+      setWalletBalance(w.data.balance ?? 0);
     }).finally(() => setLoading(false));
   };
 
@@ -59,6 +62,12 @@ export default function StudentMealsPage() {
           <h1 className="text-xl md:text-3xl font-bold text-white mt-1">My Meals</h1>
           <p className="text-white/70 text-xs md:text-sm mt-1">Book your meals and track attendance.</p>
         </div>
+      </div>
+
+      <div className="relative overflow-hidden rounded-xl p-4 bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg">
+        <p className="text-[10px] text-white/80 font-medium uppercase tracking-wider">Wallet Balance</p>
+        <p className="text-xl font-bold mt-1">৳{walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+        <p className="text-[10px] text-white/60 mt-0.5">Meal costs auto-deduct when attendance is marked</p>
       </div>
 
       <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">

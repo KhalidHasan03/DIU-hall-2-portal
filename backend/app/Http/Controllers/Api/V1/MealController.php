@@ -17,6 +17,64 @@ use Illuminate\Support\Facades\DB;
 
 class MealController extends Controller
 {
+    public static function autoAttendExpiredMeals(): void
+    {
+        $today = now()->toDateString();
+        $now = now()->format('H:i');
+
+        $cutoffs = [
+            'lunch' => Setting::where('key', 'lunch_cutoff_time')->value('value') ?? '12:00',
+            'dinner' => Setting::where('key', 'dinner_cutoff_time')->value('value') ?? '14:00',
+        ];
+
+        foreach ($cutoffs as $mealType => $cutoff) {
+            if ($now < $cutoff) continue;
+
+            $menu = DailyMenu::where('date', $today)->where('meal_type', $mealType)->first();
+            if (!$menu) continue;
+
+            $expired = MealAttendance::where('daily_menu_id', $menu->id)
+                ->where('status', 'booked')
+                ->with('student')
+                ->get();
+
+            if ($expired->isEmpty()) continue;
+
+            $mealMonth = now()->format('Y-m');
+            $mealRate = MealRateService::calculate($mealMonth);
+
+            foreach ($expired as $attendance) {
+                $attendance->update(['status' => 'attended', 'marked_at' => now()]);
+
+                $student = $attendance->student;
+                if (!$student || $mealRate <= 0) continue;
+
+                $balanceBefore = (float) $student->balance;
+                $student->decrement('balance', $mealRate);
+                $student->refresh();
+                $balanceAfter = (float) $student->balance;
+
+                if ($balanceAfter < 0) {
+                    $student->update(['meal_debt' => abs($balanceAfter)]);
+                } elseif ($student->meal_debt > 0) {
+                    $student->update(['meal_debt' => 0]);
+                }
+
+                Transaction::create([
+                    'student_id' => $student->id,
+                    'type' => 'debit',
+                    'amount' => $mealRate,
+                    'balance_before' => $balanceBefore,
+                    'balance_after' => $balanceAfter,
+                    'description' => ucfirst($mealType) . ' auto-attended on ' . $today,
+                    'reference_type' => 'meal_attendance',
+                    'reference_id' => $attendance->id,
+                    'created_by' => null,
+                ]);
+            }
+        }
+    }
+
     public function book(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -79,6 +137,8 @@ class MealController extends Controller
 
     public function todayStatus(Request $request): JsonResponse
     {
+        static::autoAttendExpiredMeals();
+
         $student = $request->user()->student;
         if (!$student) {
             return response()->json([], 200);
@@ -112,6 +172,8 @@ class MealController extends Controller
 
     public function history(Request $request): JsonResponse
     {
+        static::autoAttendExpiredMeals();
+
         $student = $request->user()->student;
         if (!$student) {
             return response()->json([], 200);
@@ -210,6 +272,7 @@ class MealController extends Controller
 
     public function dailyReport(Request $request): JsonResponse
     {
+        static::autoAttendExpiredMeals();
         $date = $request->input('date', now()->toDateString());
 
         $menus = DailyMenu::where('date', $date)->get();
@@ -274,6 +337,7 @@ class MealController extends Controller
 
     public function toggle(Request $request): JsonResponse
     {
+        static::autoAttendExpiredMeals();
         $validated = $request->validate([
             'student_id' => 'required|exists:students,id',
             'meal_type' => 'required|in:lunch,dinner',
@@ -345,6 +409,8 @@ class MealController extends Controller
 
     public function studentToggle(Request $request): JsonResponse
     {
+        static::autoAttendExpiredMeals();
+
         $student = $request->user()->student;
         if (!$student) {
             return response()->json(['message' => 'Student profile not found.'], 404);

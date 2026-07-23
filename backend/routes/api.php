@@ -43,6 +43,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/dashboard', [StudentDashboardController::class, 'index']);
             Route::get('/menu/today', [MenuController::class, 'today']);
             Route::get('/menu/weekly', [MenuController::class, 'weekly']);
+            Route::get('/menu/range', [MenuController::class, 'byDateRange']);
             Route::post('/meals/book', [MealController::class, 'book']);
             Route::delete('/meals/{mealAttendance}', [MealController::class, 'cancel']);
             Route::post('/meals/toggle', [MealController::class, 'studentToggle']);
@@ -74,10 +75,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/payments/summary', [PaymentController::class, 'summary']);
             Route::get('/payments', [PaymentController::class, 'index']);
             Route::get('/students/meal-summary', [StudentController::class, 'mealSummary']);
-            Route::get('/students/pending', [StudentController::class, 'pending']);
             Route::apiResource('students', StudentController::class);
-            Route::post('/students/{student}/approve', [StudentController::class, 'approve']);
-            Route::post('/students/{student}/reject', [StudentController::class, 'reject']);
             Route::get('/settings/meal', [SettingController::class, 'mealSettings']);
             Route::put('/settings/meal', [SettingController::class, 'updateMealSettings']);
             Route::get('/reports/monthly', [ReportController::class, 'monthly']);

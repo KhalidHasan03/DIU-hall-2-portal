@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MonthlyBill;
 use App\Models\MealAttendance;
 use App\Models\Student;
+use App\Models\Transaction;
 use App\Services\ActivityLogger;
 use App\Services\MealRateService;
 use Illuminate\Http\JsonResponse;
@@ -28,17 +29,25 @@ class BillController extends Controller
             return response()->json(null, 200);
         }
 
-        $walletBalance = round((float) $student->balance, 2);
-        $walletCovered = round(min((float) $bill->total_amount, $walletBalance), 2);
+        [$year, $monthNum] = explode('-', $bill->month);
+        $totalDeducted = (float) \App\Models\Transaction::where('student_id', $student->id)
+            ->where('type', 'debit')
+            ->whereYear('created_at', $year)
+            ->whereMonth('created_at', $monthNum)
+            ->sum('amount');
 
-        $bill->total_amount = round((float) $bill->total_amount, 2);
-        $bill->wallet_balance = $walletBalance;
-        $bill->paid_amount = $walletCovered;
-        $bill->due_amount = round(max(0, (float) $bill->total_amount - $walletBalance), 2);
+        $totalAmount = round((float) $bill->total_amount, 2);
+        $paidAmount = round(min($totalAmount, $totalDeducted), 2);
+        $dueAmount = round(max(0, $totalAmount - $paidAmount), 2);
 
-        if ($walletBalance >= (float) $bill->total_amount) {
+        $bill->total_amount = $totalAmount;
+        $bill->wallet_balance = round((float) $student->balance, 2);
+        $bill->paid_amount = $paidAmount;
+        $bill->due_amount = $dueAmount;
+
+        if ($dueAmount <= 0) {
             $bill->status = 'paid';
-        } elseif ($walletBalance > 0) {
+        } elseif ($paidAmount > 0) {
             $bill->status = 'partial';
         }
 
@@ -64,19 +73,27 @@ class BillController extends Controller
         [$year, $monthNum] = explode('-', $month);
         $mealRate = MealRateService::calculate($month);
         $students = Student::where('status', 'approved')->get();
+
+        $totalDeductions = Transaction::where('type', 'debit')
+            ->whereYear('created_at', $year)
+            ->whereMonth('created_at', $monthNum)
+            ->groupBy('student_id')
+            ->selectRaw('student_id, SUM(amount) as total')
+            ->pluck('total', 'student_id');
+
         $generated = [];
 
         foreach ($students as $student) {
             $totalMeals = MealAttendance::where('student_id', $student->id)
                 ->where('status', 'attended')
-                ->whereHas('dailyMenu', function ($q) use ($year, $monthNum) {
-                    $q->whereYear('date', $year)->whereMonth('date', $monthNum);
-                })->count();
+                ->whereHas('dailyMenu', fn($q) => $q->whereYear('date', $year)->whereMonth('date', $monthNum))
+                ->count();
 
             $total = round($totalMeals * $mealRate, 2);
-            $walletBalance = round((float) $student->balance, 2);
+            $alreadyPaid = (float) ($totalDeductions[$student->id] ?? 0);
+            $due = round(max(0, $total - $alreadyPaid), 2);
 
-            $status = $walletBalance >= $total ? 'paid' : ($walletBalance > 0 ? 'partial' : 'pending');
+            $status = $due <= 0 ? 'paid' : ($alreadyPaid > 0 ? 'partial' : 'pending');
 
             $bill = MonthlyBill::updateOrCreate(
                 ['student_id' => $student->id, 'month' => $month],
@@ -125,21 +142,31 @@ class BillController extends Controller
     public function dueStudents(Request $request): JsonResponse
     {
         $month = $request->input('month', now()->format('Y-m'));
+        [$year, $monthNum] = explode('-', $month);
+
         $bills = MonthlyBill::where('month', $month)
             ->with('student.user')
             ->get();
 
-        return response()->json($bills->map(function ($bill) {
-            $walletBalance = round((float) ($bill->student?->balance ?? 0), 2);
-            $paid = round(min((float) $bill->total_amount, $walletBalance), 2);
+        $totalDeductions = Transaction::where('type', 'debit')
+            ->whereYear('created_at', $year)
+            ->whereMonth('created_at', $monthNum)
+            ->groupBy('student_id')
+            ->selectRaw('student_id, SUM(amount) as total')
+            ->pluck('total', 'student_id');
+
+        return response()->json($bills->map(function ($bill) use ($totalDeductions) {
+            $totalAmount = round((float) $bill->total_amount, 2);
+            $totalDeducted = (float) ($totalDeductions[$bill->student_id] ?? 0);
+            $paid = round(min($totalAmount, $totalDeducted), 2);
             return [
                 'id' => $bill->id,
                 'student_name' => $bill->student->user->name,
                 'room_number' => $bill->student->room_number,
-                'total_amount' => round((float) $bill->total_amount, 2),
-                'wallet_balance' => $walletBalance,
+                'total_amount' => $totalAmount,
+                'wallet_balance' => round((float) ($bill->student?->balance ?? 0), 2),
                 'paid' => $paid,
-                'due' => round(max(0, (float) $bill->total_amount - $walletBalance), 2),
+                'due' => round(max(0, $totalAmount - $paid), 2),
             ];
         }));
     }
@@ -151,12 +178,19 @@ class BillController extends Controller
 
         $students = Student::with('user')->where('status', 'approved')->get();
 
-        $result = $students->map(function ($student) use ($month, $year, $monthNum) {
+        $totalDeductions = Transaction::where('type', 'debit')
+            ->whereYear('created_at', $year)
+            ->whereMonth('created_at', $monthNum)
+            ->groupBy('student_id')
+            ->selectRaw('student_id, SUM(amount) as total')
+            ->pluck('total', 'student_id');
+
+        $result = $students->map(function ($student) use ($month, $year, $monthNum, $totalDeductions) {
             $bill = MonthlyBill::where('student_id', $student->id)->where('month', $month)->first();
             $totalAmount = $bill ? round((float) $bill->total_amount, 2) : 0;
-            $walletBalance = round((float) $student->balance, 2);
-            $paid = round(min($totalAmount, $walletBalance), 2);
-            $due = round(max(0, $totalAmount - $walletBalance), 2);
+            $totalDeducted = (float) ($totalDeductions[$student->id] ?? 0);
+            $paid = round(min($totalAmount, $totalDeducted), 2);
+            $due = round(max(0, $totalAmount - $paid), 2);
 
             $totalMeals = MealAttendance::where('student_id', $student->id)
                 ->where('status', 'attended')
@@ -169,7 +203,7 @@ class BillController extends Controller
                 'room_number' => $student->room_number,
                 'total_meals' => $totalMeals,
                 'total_amount' => $totalAmount,
-                'wallet_balance' => $walletBalance,
+                'wallet_balance' => round((float) $student->balance, 2),
                 'paid' => $paid,
                 'due' => $due,
             ];

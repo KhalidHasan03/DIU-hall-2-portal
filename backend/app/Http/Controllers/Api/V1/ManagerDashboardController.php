@@ -44,8 +44,6 @@ class ManagerDashboardController extends Controller
         $lunchMenu = DailyMenu::whereDate('date', $today)->where('meal_type', 'lunch')->first();
         $dinnerMenu = DailyMenu::whereDate('date', $today)->where('meal_type', 'dinner')->first();
 
-        $pendingStudents = Student::where('status', 'pending')->count();
-
         $lunchCutoff = Setting::where('key', 'lunch_cutoff_time')->value('value') ?? '12:00';
         $dinnerCutoff = Setting::where('key', 'dinner_cutoff_time')->value('value') ?? '14:00';
 
@@ -63,7 +61,6 @@ class ManagerDashboardController extends Controller
             'net_balance' => round($totalCollection - $totalExpenses, 2),
             'total_due' => $totalDue,
             'total_monthly_meals' => $totalMonthlyMeals,
-            'pending_students' => $pendingStudents,
             'lunch_cutoff' => $lunchCutoff,
             'dinner_cutoff' => $dinnerCutoff,
             'recent_payments' => $recentPayments,

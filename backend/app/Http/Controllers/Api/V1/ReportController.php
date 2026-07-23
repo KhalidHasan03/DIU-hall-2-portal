@@ -163,7 +163,6 @@ class ReportController extends Controller
             fputcsv($handle, ['Wallet Credits (BDT)', $t['wallet_credits']]);
             fputcsv($handle, ['Bill Total (BDT)', $t['bill_totals']]);
             fputcsv($handle, ['Bill Paid (BDT)', $t['bill_paid']]);
-            fputcsv($handle, ['Bill Paid (BDT)', $t['bill_paid']]);
             fputcsv($handle, ['Bill Due (BDT)', $t['bill_due']]);
             fputcsv($handle, ['Get Back (BDT)', $t['get_back']]);
             fputcsv($handle, []);

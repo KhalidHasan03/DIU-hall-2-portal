@@ -124,12 +124,6 @@ export default function ManagerDashboard() {
       </div>
 
       <ManagerMealSettings data={data} />
-      {data?.pending_students > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
-          <span className="text-xl">⏳</span>
-          <p className="text-sm text-amber-800"><strong>{data.pending_students}</strong> student(s) pending approval. <a href="/dashboard/hall-tutor/approvals" className="underline font-medium">Review now</a></p>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">

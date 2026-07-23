@@ -6,38 +6,84 @@ import { getLocalDateString } from '../../utils/dateUtils';
 
 export default function ManagerMenusPage() {
   const [menus, setMenus] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingMenu, setEditingMenu] = useState<any | null>(null);
   const [form, setForm] = useState({ date: getLocalDateString(), meal_type: 'lunch', menu_text: '' });
 
   const fetchMenus = () => {
-    setLoading(true);
-    api.get('/manager/menus').then(({ data }) => setMenus(data.data || data)).catch(() => toast.error('Failed to load menus')).finally(() => setLoading(false));
+    api.get('/manager/menus').then(({ data }) => setMenus(data.data || data)).catch(() => toast.error('Failed to load menus')).finally(() => setInitialLoading(false));
   };
 
   useEffect(() => { fetchMenus(); }, []);
 
+  const toDateInputValue = (date: any): string => {
+    if (!date) return getLocalDateString();
+    const d = String(date).slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    return getLocalDateString();
+  };
+
+  const openAddForm = () => {
+    setEditingMenu(null);
+    setForm({ date: getLocalDateString(), meal_type: 'lunch', menu_text: '' });
+    setShowForm(true);
+  };
+
+  const openEditForm = (menu: any) => {
+    setEditingMenu(menu);
+    setForm({ date: toDateInputValue(menu.date), meal_type: menu.meal_type, menu_text: menu.menu_text });
+    setShowForm(true);
+  };
+
+  const cancelForm = () => {
+    setShowForm(false);
+    setEditingMenu(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const previousForm = { ...form };
+    const wasEditing = !!editingMenu;
     try {
-      await api.post('/manager/menus', form);
-      toast.success('Menu added!');
-      setShowForm(false);
-      setForm({ date: getLocalDateString(), meal_type: 'lunch', menu_text: '' });
-      fetchMenus();
-    } catch { toast.error('Failed to add menu'); }
+      if (editingMenu) {
+        const { data: updated } = await api.put(`/manager/menus/${editingMenu.id}`, form);
+        setMenus(prev => prev.map(m => m.id === updated.id ? { ...m, ...updated } : m));
+        toast.success('Menu updated!');
+      } else {
+        const res = await api.post('/manager/menus', form);
+        const created = res.data;
+        setMenus(prev => {
+          const idx = prev.findIndex(m => m.id === created.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...created };
+            return next;
+          }
+          return [created, ...prev];
+        });
+        toast.success(res.status === 200 ? 'Menu updated!' : 'Menu added!');
+      }
+      cancelForm();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message
+        || (err?.response?.data?.errors ? Object.values(err.response.data.errors).flat().join(', ') : null)
+        || (wasEditing ? 'Failed to update menu' : 'Failed to add menu');
+      toast.error(msg);
+      setForm(previousForm);
+    }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this menu?')) return;
     try {
       await api.delete(`/manager/menus/${id}`);
+      setMenus(prev => prev.filter(m => m.id !== id));
       toast.success('Menu deleted');
-      fetchMenus();
     } catch { toast.error('Delete failed'); }
   };
 
-  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner /></div>;
+  if (initialLoading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner /></div>;
 
   const grouped = menus.reduce((acc: any, m: any) => {
     if (!acc[m.date]) acc[m.date] = [];
@@ -57,7 +103,7 @@ export default function ManagerMenusPage() {
       </div>
 
       <div className="flex justify-end">
-        <button onClick={() => setShowForm(!showForm)} className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl text-sm font-medium shadow-lg shadow-orange-200 hover:shadow-xl transition-all">
+        <button onClick={() => showForm ? cancelForm() : openAddForm()} className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl text-sm font-medium shadow-lg shadow-orange-200 hover:shadow-xl transition-all">
           {showForm ? 'Cancel' : '+ Add Menu'}
         </button>
       </div>
@@ -81,7 +127,16 @@ export default function ManagerMenusPage() {
               <input type="text" value={form.menu_text} onChange={e => setForm({...form, menu_text: e.target.value})} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none" placeholder="e.g. Rice, Chicken Curry, Dal" required />
             </div>
           </div>
-          <button type="submit" className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl text-sm font-medium shadow-md">Save Menu</button>
+          <div className="flex gap-2">
+            <button type="submit" className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl text-sm font-medium shadow-md">
+              {editingMenu ? 'Update Menu' : 'Save Menu'}
+            </button>
+            {editingMenu && (
+              <button type="button" onClick={cancelForm} className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors">
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
       )}
 
@@ -115,7 +170,10 @@ export default function ManagerMenusPage() {
                           <p className="text-xs text-slate-500 truncate">{m.menu_text}</p>
                         </div>
                       </div>
-                      <button onClick={() => handleDelete(m.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs font-medium transition-opacity shrink-0">Delete</button>
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <button onClick={() => openEditForm(m)} className="text-indigo-400 hover:text-indigo-600 text-xs font-medium">Edit</button>
+                        <button onClick={() => handleDelete(m.id)} className="text-red-400 hover:text-red-600 text-xs font-medium">Delete</button>
+                      </div>
                     </div>
                   ))}
                 </div>

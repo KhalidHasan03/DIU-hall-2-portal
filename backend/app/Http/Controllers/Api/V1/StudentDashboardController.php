@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\V1\MealController;
 use App\Models\DailyMenu;
 use App\Models\MealAttendance;
 use App\Models\MonthlyBill;
 use App\Models\Notice;
 use App\Models\Student;
+use App\Models\Transaction;
 use App\Services\MealRateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +18,8 @@ class StudentDashboardController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        MealController::autoAttendExpiredMeals();
+
         $student = $request->user()->student;
         $today = now()->toDateString();
         $month = $request->input('month', now()->format('Y-m'));
@@ -49,8 +53,12 @@ class StudentDashboardController extends Controller
                 ->where('month', $month)
                 ->first();
             if ($currentBill) {
-                $walletCovered = round(min((float) $currentBill->total_amount, $walletBalance), 2);
-                $totalPaid = $walletCovered;
+                $totalDeducted = (float) Transaction::where('student_id', $student->id)
+                    ->where('type', 'debit')
+                    ->whereYear('created_at', $year)
+                    ->whereMonth('created_at', $monthNum)
+                    ->sum('amount');
+                $totalPaid = round(min((float) $currentBill->total_amount, $totalDeducted), 2);
             }
         }
 
@@ -87,9 +95,16 @@ class StudentDashboardController extends Controller
         $totalStudents = Student::where('status', 'approved')->count();
         $myDueRank = null;
         if ($student) {
-            $allDues = MonthlyBill::where('month', $month)->get()->map(function ($b) {
-                $wallet = $b->student ? round((float) $b->student->balance, 2) : 0;
-                return ['student_id' => $b->student_id, 'due' => round(max(0, (float) $b->total_amount - $wallet), 2)];
+            $allDeductions = Transaction::where('type', 'debit')
+                ->whereYear('created_at', $year)
+                ->whereMonth('created_at', $monthNum)
+                ->groupBy('student_id')
+                ->selectRaw('student_id, SUM(amount) as total_deducted')
+                ->pluck('total_deducted', 'student_id');
+
+            $allDues = MonthlyBill::where('month', $month)->get()->map(function ($b) use ($allDeductions) {
+                $totalDeducted = (float) ($allDeductions[$b->student_id] ?? 0);
+                return ['student_id' => $b->student_id, 'due' => round(max(0, (float) $b->total_amount - $totalDeducted), 2)];
             })->sortByDesc('due')->values();
             $myDueRank = $allDues->search(function ($d) use ($student) {
                 return $d['student_id'] === $student->id;

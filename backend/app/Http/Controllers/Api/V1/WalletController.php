@@ -30,7 +30,7 @@ class WalletController extends Controller
         $transactions = $student->transactions()
             ->with('creator')
             ->orderBy('created_at', 'desc')
-            ->paginate(20);
+            ->get();
 
         return response()->json($transactions);
     }

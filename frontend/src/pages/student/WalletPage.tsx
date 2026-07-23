@@ -13,7 +13,7 @@ export default function WalletPage() {
       api.get('/student/wallet/history'),
     ]).then(([bal, txns]) => {
       setBalance(bal.data.balance ?? 0);
-      setTransactions(txns.data.data ?? txns.data ?? []);
+      setTransactions(Array.isArray(txns.data) ? txns.data : txns.data.data ?? []);
     }).finally(() => setLoading(false));
   }, []);
 

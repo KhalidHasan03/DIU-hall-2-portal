@@ -19,7 +19,7 @@ function MealCard({ item, variant }: { item: any; variant: 'lunch' | 'dinner' })
               {item.date ? new Date(item.date).toLocaleDateString('en-BD', { weekday: 'long' }) : 'Today'}
             </p>
             <h3 className="text-base md:text-lg font-bold text-slate-800 capitalize mt-0.5">{variant}</h3>
-            <p className="text-xs md:text-sm text-slate-600 mt-1 md:mt-2 leading-relaxed">{item.menu_text || 'No menu set for today'}</p>
+            <p className="text-xs md:text-sm text-slate-600 mt-1 md:mt-2 leading-relaxed">{item.menu_text || 'No menu set'}</p>
             {item.date && (
               <p className="text-[10px] md:text-xs text-slate-400 mt-2 md:mt-3 flex items-center gap-1">
                 <span>📅</span>
@@ -35,19 +35,31 @@ function MealCard({ item, variant }: { item: any; variant: 'lunch' | 'dinner' })
 
 export default function StudentMenuPage() {
   const [todayMenu, setTodayMenu] = useState<any[]>([]);
-  const [weeklyMenu, setWeeklyMenu] = useState<any[]>([]);
+  const [pastMenu, setPastMenu] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'today' | 'weekly'>('today');
+  const [pastLoading, setPastLoading] = useState(false);
+  const [tab, setTab] = useState<'today' | 'past'>('today');
 
   useEffect(() => {
-    Promise.all([
-      api.get('/student/menu/today'),
-      api.get('/student/menu/weekly'),
-    ]).then(([today, weekly]) => {
-      setTodayMenu(today.data);
-      setWeeklyMenu(weekly.data);
-    }).finally(() => setLoading(false));
+    api.get('/student/menu/today')
+      .then(({ data }) => setTodayMenu(data))
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (tab !== 'past') return;
+    setPastLoading(true);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    api.get('/student/menu/range', { params: { from: fmt(sevenDaysAgo), to: fmt(yesterday) } })
+      .then(({ data }) => setPastMenu(data))
+      .catch(() => setPastMenu([]))
+      .finally(() => setPastLoading(false));
+  }, [tab]);
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner /></div>;
 
@@ -60,7 +72,7 @@ export default function StudentMenuPage() {
         <div className="absolute top-0 right-0 w-36 h-36 md:w-48 md:h-48 bg-white/10 rounded-full blur-2xl" />
         <div className="relative">
           <p className="text-white/80 text-xs md:text-sm font-medium uppercase tracking-wider">Meal Menu</p>
-          <h1 className="text-xl md:text-3xl font-bold text-white mt-1">What's Cooking Today?</h1>
+          <h1 className="text-xl md:text-3xl font-bold text-white mt-1">What's Cooking?</h1>
         </div>
       </div>
 
@@ -70,10 +82,10 @@ export default function StudentMenuPage() {
         }`}>
           <span className="mr-1">📅</span> Today
         </button>
-        <button onClick={() => setTab('weekly')} className={`px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-medium transition-all ${
-          tab === 'weekly' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-200' : 'text-slate-600 hover:text-slate-800'
+        <button onClick={() => setTab('past')} className={`px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-medium transition-all ${
+          tab === 'past' ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-200' : 'text-slate-600 hover:text-slate-800'
         }`}>
-          <span className="mr-1">📆</span> This Week
+          <span className="mr-1">📆</span> Past Days
         </button>
       </div>
 
@@ -84,15 +96,17 @@ export default function StudentMenuPage() {
         </div>
       ) : (
         <div className="space-y-3 md:space-y-4">
-          {weeklyMenu.length === 0 ? (
+          {pastLoading ? (
+            <div className="flex justify-center py-8"><LoadingSpinner /></div>
+          ) : pastMenu.length === 0 ? (
             <div className="bg-white rounded-2xl p-8 md:p-12 text-center border border-dashed border-slate-200">
               <span className="text-3xl md:text-5xl block mb-3 md:mb-4">📆</span>
-              <p className="text-sm md:text-lg text-slate-400 font-medium">No weekly menu available</p>
-              <p className="text-xs md:text-sm text-slate-300 mt-1">The manager hasn't set the weekly menu yet.</p>
+              <p className="text-sm md:text-lg text-slate-400 font-medium">No past menus available</p>
+              <p className="text-xs md:text-sm text-slate-300 mt-1">Menus from the last 7 days will appear here.</p>
             </div>
           ) : (
             ['lunch', 'dinner'].map(type => {
-              const meals = weeklyMenu.filter((m: any) => m.meal_type === type);
+              const meals = pastMenu.filter((m: any) => m.meal_type === type);
               if (!meals.length) return null;
               return (
                 <div key={type} className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">

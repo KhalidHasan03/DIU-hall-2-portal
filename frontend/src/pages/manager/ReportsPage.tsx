@@ -43,11 +43,9 @@ export default function ManagerReportsPage() {
     : [];
 
   const handleExport = () => {
-    const token = localStorage.getItem('token');
-    const url = `${window.location.origin}/api/v1/manager/reports/export?month=${month}`;
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => { if (!res.ok) throw new Error(); return res.blob(); })
-      .then(blob => {
+    api.get('/manager/reports/export', { params: { month }, responseType: 'blob' })
+      .then(res => {
+        const blob = res.data;
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = `monthly-report-${month}.csv`;
@@ -236,9 +234,9 @@ export default function ManagerReportsPage() {
             <p className="text-xs text-rose-700 font-medium">Expenses</p>
             <p className="text-lg font-bold text-rose-800">৳{Number(s.total_expenses || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
-          <div className="p-3 rounded-xl bg-blue-50 border border-blue-200">
-            <p className="text-xs text-blue-700 font-medium">Wallet Credits</p>
-            <p className="text-lg font-bold text-blue-800">৳{Number(t.wallet_credits || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
+            <p className="text-xs text-amber-700 font-medium">Meal Deductions</p>
+            <p className="text-lg font-bold text-amber-800">৳{Number(s.meal_deductions || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="p-3 rounded-xl bg-violet-50 border border-violet-200">
             <p className="text-xs text-violet-700 font-medium">Surplus (Get Back)</p>

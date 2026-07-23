@@ -61,8 +61,6 @@ export default function StudentDashboard() {
   const dueAmount = Number(data?.due_amount || 0);
   const totalBill = Number(data?.current_bill?.total_amount || 0);
   const paidAmount = Number(data?.paid_amount || 0);
-  const billProgress = totalBill > 0 ? Math.round((paidAmount / totalBill) * 100) : 0;
-  const isCurrentMonth = month === getLocalMonthString();
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
@@ -82,53 +80,51 @@ export default function StudentDashboard() {
         <span className="text-sm font-medium text-slate-600">📅 Month:</span>
         <input type="month" value={month} onChange={e => setMonth(e.target.value)}
           className="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none" />
-        {data?.my_due_rank !== null && data?.my_due_rank !== undefined && (
-          <RankBadge rank={data.my_due_rank} />
-        )}
-        {data?.my_due_rank !== null && data?.my_due_rank !== undefined && (
-          <span className="text-xs text-slate-400">
-            {data.my_due_rank === 1 ? 'You lead the due list! 😅' : `Your due rank: #${data.my_due_rank}`}
-          </span>
+        {data?.my_due_rank != null && (
+          <>
+            <RankBadge rank={data.my_due_rank} />
+            <span className="text-xs text-slate-400">
+              {data.my_due_rank === 1 ? 'You lead the due list! 😅' : `Your due rank: #${data.my_due_rank}`}
+            </span>
+          </>
         )}
       </div>
 
-      {isCurrentMonth && (
-        <div>
-          <h2 className="text-sm md:text-lg font-semibold text-slate-800 mb-3 md:mb-4 flex items-center gap-2">
-            <span className="w-1 h-5 bg-indigo-500 rounded-full inline-block" />
-            Today's Meals
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-            {data?.today_meals?.length ? data.today_meals.map((meal: any) => (
-              <div key={meal.meal_type} className="group relative bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-indigo-200 transition-all duration-300">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-3 md:gap-4 min-w-0">
-                    <div className={`w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center text-lg md:text-2xl shrink-0 ${
-                      meal.meal_type === 'lunch' ? 'bg-gradient-to-br from-orange-400/20 to-orange-500/20' : 'bg-gradient-to-br from-indigo-400/20 to-indigo-500/20'
-                    }`}>
-                      {meal.meal_type === 'lunch' ? '☀️' : '🌙'}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-800 capitalize text-sm md:text-lg">{meal.meal_type}</p>
-                      <p className="text-slate-500 text-xs md:text-sm mt-0.5 truncate">{meal.menu_text || 'Menu not set'}</p>
-                    </div>
+      <div>
+        <h2 className="text-sm md:text-lg font-semibold text-slate-800 mb-3 md:mb-4 flex items-center gap-2">
+          <span className="w-1 h-5 bg-indigo-500 rounded-full inline-block" />
+          Today's Meals
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+          {data?.today_meals?.length ? data.today_meals.map((meal: any) => (
+            <div key={meal.meal_type} className="group relative bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-indigo-200 transition-all duration-300">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-3 md:gap-4 min-w-0">
+                  <div className={`w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center text-lg md:text-2xl shrink-0 ${
+                    meal.meal_type === 'lunch' ? 'bg-gradient-to-br from-orange-400/20 to-orange-500/20' : 'bg-gradient-to-br from-indigo-400/20 to-indigo-500/20'
+                  }`}>
+                    {meal.meal_type === 'lunch' ? '☀️' : '🌙'}
                   </div>
-                  <MealStatusBadge status={meal.status} />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-800 capitalize text-sm md:text-lg">{meal.meal_type}</p>
+                    <p className="text-slate-500 text-xs md:text-sm mt-0.5 truncate">{meal.menu_text || 'Menu not set'}</p>
+                  </div>
                 </div>
+                <MealStatusBadge status={meal.status} />
               </div>
-            )) : (
-              <div className="col-span-full bg-white rounded-2xl p-6 md:p-8 text-center border border-dashed border-slate-200">
-                <p className="text-slate-400 text-sm md:text-lg font-medium">No meals scheduled for today</p>
-                <p className="text-slate-300 text-xs md:text-sm mt-1">Your hall manager will update the menu soon.</p>
-              </div>
-            )}
-          </div>
+            </div>
+          )) : (
+            <div className="col-span-full bg-white rounded-2xl p-6 md:p-8 text-center border border-dashed border-slate-200">
+              <p className="text-slate-400 text-sm md:text-lg font-medium">No meals scheduled for today</p>
+              <p className="text-slate-300 text-xs md:text-sm mt-1">Your hall manager will update the menu soon.</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <StatCard title="Monthly Bill" value={`৳${totalBill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub={data?.current_bill?.month ? `Period: ${data.current_bill.month}` : 'No bill yet'} gradient="bg-gradient-to-br from-emerald-500 to-teal-600" icon="🧾" />
-        <StatCard title="Paid Amount" value={`৳${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub={`${billProgress}% of total bill`} gradient="bg-gradient-to-br from-blue-500 to-indigo-600" icon="💰" />
+        <StatCard title="Paid Amount" value={`৳${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub={`Paid via meal deductions`} gradient="bg-gradient-to-br from-blue-500 to-indigo-600" icon="💰" />
         <StatCard title="Due Amount" value={`৳${dueAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub={dueAmount > 0 ? 'Payment pending' : 'All clear!'} gradient={dueAmount > 0 ? 'bg-gradient-to-br from-rose-500 to-pink-600' : 'bg-gradient-to-br from-slate-500 to-slate-600'} icon={dueAmount > 0 ? '⚠️' : '✅'} />
         {(data?.meal_debt ?? 0) > 0 ? (
           <StatCard title="Meal Debt" value={`৳${(data?.meal_debt ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub="Outstanding meal cost" gradient="bg-gradient-to-br from-rose-500 to-pink-600" icon="📋" />
@@ -143,22 +139,6 @@ export default function StudentDashboard() {
         <StatCard title="Total Expenses" value={`৳${(data?.total_expenses || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub="Hall-wide this month" gradient="bg-gradient-to-br from-orange-500 to-rose-600" icon="💸" />
         <StatCard title="Total Meals Served" value={data?.total_attended_meals || 0} sub={`Across ${data?.total_students || 0} students`} gradient="bg-gradient-to-br from-purple-500 to-pink-600" icon="🍳" />
       </div>
-
-      {totalBill > 0 && (
-        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm md:text-base font-semibold text-slate-800">Bill Payment Progress</h3>
-            <span className="text-sm font-bold text-indigo-600">{billProgress}%</span>
-          </div>
-          <div className="w-full h-2.5 md:h-3 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700 ease-out" style={{ width: `${billProgress}%` }} />
-          </div>
-          <div className="flex justify-between text-[10px] md:text-xs text-slate-400 mt-2">
-            <span>Paid: ৳{paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            <span>Total: ৳{totalBill.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          </div>
-        </div>
-      )}
 
       <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">
         <h2 className="text-sm md:text-lg font-semibold text-slate-800 mb-3 md:mb-4 flex items-center gap-2">
